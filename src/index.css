@@ -1,0 +1,682 @@
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════
+   ISOKE — Clinical Luxury Design System
+   Display: Fraunces (warm optical-size serif)
+   Body: Plus Jakarta Sans (humanist grotesk)
+   Palette: Ink-violet · Lavender · Warm cream · Teal
+═══════════════════════════════════════════════════════ */
+
+:root {
+  /* Primary purple — matches logo wordmark */
+  --violet:          #7B5EA7;
+  --violet-mid:      #9070BF;
+  --violet-deep:     #1E1230;
+  /* Lavender — lighter tint of logo purple */
+  --lavender:        #B89FD8;
+  --lavender-soft:   #D4C4EC;
+  /* Coral/peach — logo swoosh accent */
+  --teal:            #E8956D;
+  --teal-deep:       #D4784A;
+  /* Warm amber — kept for contrast */
+  --amber:           #D4A055;
+  --amber-soft:      #E8C07A;
+
+  --cream:           #F5F0EC;
+  --cream-dark:      #EDE5DC;
+  --ink:             #1E1230;
+  --ink-mid:         #332050;
+  --ink-soft:        #4A3468;
+  --muted:           #7A6E8A;
+
+  --glass-dark:      rgba(255,255,255,0.06);
+  --glass-light:     rgba(255,255,255,0.72);
+  --glass-bd-dark:   rgba(255,255,255,0.12);
+  --glass-bd-light:  rgba(123,94,167,0.14);
+  --glass-hi:        rgba(255,255,255,0.18);
+  --glass-blur:      20px;
+
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body:    'Plus Jakarta Sans', system-ui, sans-serif;
+
+  --section-py:   clamp(5rem, 8vw, 8rem);
+  --radius-card:  1.5rem;
+
+  --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html.dark {
+  --cream:      #0D0D0F;
+  --cream-dark: #141418;
+  --ink:        #EDE8F8;
+  --ink-mid:    #C8BFDF;
+  --muted:      #8A7EA0;
+
+  /* card / form surfaces */
+  --card-bg:        rgba(255,255,255,0.04);
+  --card-border:    rgba(184,159,216,0.14);
+  --input-bg:       rgba(255,255,255,0.06);
+  --input-border:   rgba(184,159,216,0.2);
+}
+
+:root {
+  --card-bg:        rgba(255,255,255,0.88);
+  --card-border:    rgba(123,94,167,0.1);
+  --input-bg:       rgba(255,255,255,0.55);
+  --input-border:   rgba(123,94,167,0.14);
+
+  /* Navbar */
+  --nav-bg-scrolled:     rgba(255,255,255,0.88);
+  --nav-border-scrolled: rgba(123,94,167,0.1);
+  --nav-shadow-scrolled: 0 4px 32px rgba(123,94,167,0.08);
+  --nav-link-color:      rgba(30,18,48,0.65);
+  --nav-link-hover-bg:   rgba(123,94,167,0.07);
+  --nav-mobile-bg:       rgba(255,255,255,0.97);
+}
+
+html.dark {
+  --nav-bg-scrolled:     rgba(13,13,15,0.92);
+  --nav-border-scrolled: rgba(255,255,255,0.07);
+  --nav-shadow-scrolled: 0 4px 40px rgba(0,0,0,0.6);
+  --nav-link-color:      rgba(255,255,255,0.7);
+  --nav-link-hover-bg:   rgba(184,159,216,0.09);
+  --nav-mobile-bg:       rgba(13,13,15,0.97);
+}
+
+/* ── Reset ───────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  scroll-behavior: smooth;
+  font-family: var(--font-body);
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+body {
+  background-color: var(--cream);
+  color: var(--ink);
+  line-height: 1.7;
+  transition: background-color 0.35s ease, color 0.35s ease;
+  overflow-x: hidden;
+}
+
+html.dark body {
+  background-color: #0D0D0F;
+  color: var(--cream);
+}
+
+/* ── Type scale ──────────────────────────────────── */
+h1 {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  font-weight: 700;
+}
+h2 {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+  font-weight: 600;
+}
+h3, h4 {
+  font-family: var(--font-body);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+/* ── Glass — dark background contexts ────────────── */
+.glass {
+  background: var(--glass-dark);
+  backdrop-filter: blur(var(--glass-blur)) saturate(170%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(170%);
+  border: 1px solid var(--glass-bd-dark);
+  border-radius: var(--radius-card);
+  box-shadow:
+    inset 0 1px 0 var(--glass-hi),
+    inset 0 0 0 0.5px rgba(255,255,255,0.05),
+    0 16px 56px rgba(0,0,0,0.32),
+    0 4px 16px rgba(0,0,0,0.16);
+}
+
+/* Glass — light background contexts */
+.glass-surface {
+  backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  border-radius: var(--radius-card);
+}
+
+html:not(.dark) .glass-surface {
+  background: var(--glass-light);
+  border: 1px solid var(--glass-bd-light);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.95),
+    0 8px 40px rgba(91,60,196,0.09),
+    0 2px 8px rgba(91,60,196,0.05);
+}
+
+html.dark .glass-surface {
+  background: var(--glass-dark);
+  border: 1px solid var(--glass-bd-dark);
+  box-shadow:
+    inset 0 1px 0 var(--glass-hi),
+    0 16px 56px rgba(0,0,0,0.30);
+}
+
+/* ── Gradient mesh (hero + dark sections) ─────────── */
+.gradient-mesh {
+  background:
+    radial-gradient(ellipse 80% 60% at 5% 70%, rgba(123,94,167,0.55) 0%, transparent 65%),
+    radial-gradient(ellipse 55% 50% at 92% 8%, rgba(184,159,216,0.28) 0%, transparent 60%),
+    radial-gradient(ellipse 45% 45% at 68% 92%, rgba(232,149,109,0.18) 0%, transparent 55%),
+    radial-gradient(ellipse 35% 40% at 50% 40%, rgba(30,18,48,0.5) 0%, transparent 70%),
+    linear-gradient(162deg, #0e0818 0%, #1E1230 40%, #120a1e 100%);
+}
+
+/* ── Gradient text ───────────────────────────────── */
+.gradient-text {
+  background: linear-gradient(125deg, var(--lavender) 0%, var(--teal) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+/* coral = logo swoosh, lavender = logo text purple */
+
+/* ── Section label ───────────────────────────────── */
+.label-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-body);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lavender);
+  border: 1px solid rgba(184,159,216,0.28);
+  background: rgba(184,159,216,0.07);
+  border-radius: 999px;
+  padding: 0.3rem 1rem;
+}
+
+/* ── Section spacing ─────────────────────────────── */
+.section-py {
+  padding-top: var(--section-py);
+  padding-bottom: var(--section-py);
+}
+
+/* ── Gradient divider ────────────────────────────── */
+.gradient-rule {
+  height: 1px;
+  border: none;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(184,159,216,0.35) 25%,
+    rgba(232,149,109,0.35) 75%,
+    transparent 100%
+  );
+}
+
+/* ── Warm section bg ─────────────────────────────── */
+.section-warm {
+  background: linear-gradient(180deg, var(--cream) 0%, var(--cream-dark) 100%);
+}
+html.dark .section-warm {
+  background: linear-gradient(180deg, #201540 0%, #1B1035 100%);
+}
+
+/* ── Focus & scrollbar ───────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--lavender);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(123,94,167,0.28); border-radius: 2px; }
+
+/* ══════════════════════════════════════════════════
+   MOBILE RESPONSIVE — < 768px
+══════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+
+  /* ── Navbar ──────────────────────────────────── */
+  nav[aria-label="Main navigation"] {
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+    height: 64px !important;
+  }
+  /* Burger button: flex centering only on mobile (md:hidden hides it on desktop) */
+  .burger-btn {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ── Shared: all section inner wrappers ──────── */
+  /* Target the direct child div of each section that holds maxWidth/padding */
+  section > div:first-child,
+  section > div:nth-child(2) {
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════
+   SECTION-SPECIFIC MOBILE CLASSES
+   Applied via className on the relevant element
+══════════════════════════════════════════════════ */
+
+/* Hero content wrapper */
+@media (max-width: 767px) {
+  .hero-content-wrap {
+    padding: 120px 20px 64px !important;
+  }
+  .hero-cta-row {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+  .hero-cta-row > button {
+    justify-content: center !important;
+    padding: 13px 22px !important;
+    font-size: 15px !important;
+    white-space: nowrap !important;
+  }
+  /* Hide decorative image panel on mobile — gradient mesh background is sufficient */
+  .hero-image-panel {
+    display: none !important;
+  }
+}
+
+/* About — desktop spacing (applied via class, not inline style) */
+.about-heading-row {
+  padding-bottom: 64px;
+  margin-bottom: 72px;
+}
+
+/* About — mobile overrides */
+@media (max-width: 767px) {
+  .about-inner {
+    padding: 64px 20px 80px !important;
+  }
+  .about-heading-row {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 16px !important;
+    padding-bottom: 28px !important;
+    margin-bottom: 36px !important;
+  }
+  /* h2 flex-basis was 340px for desktop width — on column direction that becomes height */
+  .about-heading-row h2 {
+    flex: 0 1 auto !important;
+  }
+  /* Hide the large decorative numeral on mobile — too much dead space */
+  .about-stat-numeral-block {
+    display: none !important;
+  }
+  .about-grid {
+    grid-template-columns: 1fr !important;
+    gap: 56px 0 !important;
+  }
+  .about-badge {
+    right: -4px !important;
+    bottom: -16px !important;
+  }
+}
+
+/* Services */
+@media (max-width: 767px) {
+  .services-inner {
+    padding: 64px 20px !important;
+  }
+  .services-header-row {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 14px !important;
+    margin-bottom: 36px !important;
+  }
+  .service-row {
+    gap: 14px !important;
+    padding: 18px 0 !important;
+  }
+  .service-index {
+    display: none !important;
+  }
+  .service-accent-bar {
+    display: none !important;
+  }
+}
+
+/* Careers */
+@media (max-width: 767px) {
+  .careers-inner {
+    padding: 64px 20px 80px !important;
+  }
+  .careers-body-cols {
+    grid-template-columns: 1fr !important;
+    gap: 48px 0 !important;
+  }
+  .careers-header-row {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+    margin-bottom: 32px !important;
+  }
+  .job-card-row {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+  .job-card-right {
+    width: 100% !important;
+    justify-content: flex-start !important;
+  }
+}
+
+/* Testimonials */
+@media (max-width: 767px) {
+  .testimonials-inner {
+    padding: 0 20px !important;
+  }
+}
+
+/* Contact */
+@media (max-width: 767px) {
+  .contact-inner {
+    padding: 64px 20px 80px !important;
+  }
+  .contact-grid {
+    grid-template-columns: 1fr !important;
+    gap: 40px !important;
+  }
+}
+
+/* Footer */
+@media (max-width: 767px) {
+  .footer-inner {
+    padding: 48px 20px 40px !important;
+  }
+  .footer-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 40px 20px !important;
+    margin-bottom: 40px !important;
+  }
+  .footer-bottom-bar {
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+    gap: 6px !important;
+  }
+}
+
+@media (max-width: 479px) {
+  .footer-grid {
+    grid-template-columns: 1fr !important;
+    gap: 32px !important;
+  }
+  .about-grid {
+    gap: 48px 0 !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════
+   DARK MODE — light section overrides
+   (About, Careers, Contact have cream backgrounds)
+══════════════════════════════════════════════════ */
+
+/* Section divider rule — softer in dark */
+html.dark .gradient-rule,
+html.dark [style*="rgba(169,139,255,0.25)"] {
+  opacity: 0.5;
+}
+
+/* About stat strip */
+html.dark .about-stat-strip {
+  background: rgba(169,139,255,0.07) !important;
+  border-color: rgba(169,139,255,0.15) !important;
+}
+html.dark .about-stat-strip-cell {
+  border-color: rgba(169,139,255,0.1) !important;
+}
+
+/* About blockquote */
+html.dark .about-blockquote {
+  border-color: rgba(169,139,255,0.35) !important;
+  color: var(--ink) !important;
+}
+
+/* Contact form card */
+html.dark .contact-form-card {
+  background: rgba(255,255,255,0.04) !important;
+  border-color: rgba(169,139,255,0.14) !important;
+  box-shadow: 0 4px 40px rgba(0,0,0,0.4) !important;
+}
+
+/* Contact / About inputs & select */
+html.dark .form-input {
+  background: rgba(255,255,255,0.07) !important;
+  border-color: rgba(169,139,255,0.22) !important;
+  color: var(--ink) !important;
+}
+html.dark .form-input::placeholder {
+  color: rgba(169,139,255,0.35) !important;
+}
+
+/* Contact map border */
+html.dark .contact-map-wrap {
+  border-color: rgba(169,139,255,0.15) !important;
+}
+
+/* Job cards */
+html.dark .job-card-row {
+  background: rgba(255,255,255,0.06) !important;
+  border-color: rgba(184,159,216,0.18) !important;
+}
+
+/* Careers — Who We're Looking For card */
+html.dark .careers-who-card {
+  background: rgba(255,255,255,0.06) !important;
+  border-color: rgba(184,159,216,0.18) !important;
+  box-shadow: 0 2px 24px rgba(0,0,0,0.3) !important;
+}
+
+/* Boost muted text legibility inside dark careers card */
+html.dark .careers-who-card p {
+  color: rgba(220,210,235,0.85) !important;
+}
+
+/* Keep the italic pull-quote closer to white */
+html.dark .careers-who-card p[style*="Fraunces"] {
+  color: rgba(240,235,250,0.95) !important;
+}
+
+/* About image overlay — slightly stronger in dark */
+html.dark .about-img-overlay {
+  background: linear-gradient(to top, rgba(18,13,42,0.65) 0%, transparent 55%) !important;
+}
+
+/* ══════════════════════════════════════════════════
+   DARK SECTIONS — near-black mode override
+   Hero, Services, Testimonials, Footer have
+   hardcoded dark-violet inline backgrounds (#0a061e / #1B1035).
+   In dark mode we place a near-black ::after overlay
+   that multiplies over the existing background.
+   Content sits above via its own z-index (already set).
+══════════════════════════════════════════════════ */
+
+/* In dark mode: darken the dark-section gradient background toward near-black.
+   The ::after overlay sits at z-index 1. Direct children that hold visible content
+   are lifted to z-index 2 so they render above the overlay. */
+html.dark .dark-section::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(13, 13, 15, 0.7);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Lift all direct children above the overlay */
+html.dark .dark-section > * {
+  position: relative;
+  z-index: 2;
+}
+
+/* ══════════════════════════════════════════════════
+   BAMBOOHR EMBED — override injected styles to match
+   the site's design system
+══════════════════════════════════════════════════ */
+
+/* ── BambooHR embed overrides ─────────────────────── */
+
+/* Strip all background/border from the outer wrappers — only rows get cards */
+#BambooHR,
+#BambooHR-ATS,
+.BambooHR-ATS-board {
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+/* Hide injected "Open Positions" heading — we have our own section heading */
+.BambooHR-ATS-board > h2,
+.BambooHR-ATS-board > div > h2,
+#BambooHR > h2 {
+  display: none !important;
+}
+
+/* Department label — same as original section label style */
+.BambooHR-ATS-Department-Header {
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.18em !important;
+  text-transform: uppercase !important;
+  color: #7B5EA7 !important;
+  padding: 20px 0 10px !important;
+  border: none !important;
+  background: transparent !important;
+}
+
+/* Strip list default styles */
+.BambooHR-ATS-Jobs-List {
+  list-style: none !important;
+  padding: 0 !important;
+  margin: 0 0 4px 0 !important;
+  border: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+}
+
+/* Each job = standalone card row */
+.BambooHR-ATS-Jobs-Item {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 22px 28px !important;
+  border-radius: 18px !important;
+  background: rgba(255,255,255,0.85) !important;
+  border: 1px solid rgba(123,94,167,0.1) !important;
+  box-shadow: 0 2px 12px rgba(123,94,167,0.04) !important;
+  margin: 0 !important;
+  transition: transform 0.22s cubic-bezier(0.16,1,0.3,1), box-shadow 0.22s !important;
+  cursor: pointer !important;
+}
+
+.BambooHR-ATS-Jobs-Item:hover {
+  transform: translateX(6px) !important;
+  box-shadow: 0 4px 24px rgba(123,94,167,0.10) !important;
+  background: rgba(255,255,255,0.95) !important;
+}
+
+/* Job title link */
+.BambooHR-ATS-Jobs-Item a {
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  line-height: 1.4 !important;
+  color: var(--ink) !important;
+  text-decoration: none !important;
+  display: block !important;
+}
+
+.BambooHR-ATS-Jobs-Item a:hover {
+  color: #7B5EA7 !important;
+}
+
+/* Location — right-aligned, muted */
+.BambooHR-ATS-Location {
+  float: none !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  color: var(--muted) !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  flex-shrink: 0 !important;
+  padding-left: 24px !important;
+}
+
+.BambooHR-ATS-blankState {
+  font-size: 14px !important;
+  color: var(--muted) !important;
+  padding: 32px 0 !important;
+  text-align: center !important;
+}
+
+/* Hide "Powered by BambooHR" */
+#BambooHR-Footer,
+.BambooHR-ATS-board > p:last-child,
+.BambooHR-ATS-board a[href*="bamboohr.com/careers"]:not([href*="isokedevelops"]) {
+  display: none !important;
+}
+
+/* Dark mode overrides */
+html.dark .BambooHR-ATS-Jobs-Item {
+  background: rgba(255,255,255,0.05) !important;
+  border-color: rgba(169,139,255,0.15) !important;
+}
+
+html.dark .BambooHR-ATS-Jobs-Item:hover {
+  background: rgba(169,139,255,0.08) !important;
+}
+
+html.dark .BambooHR-ATS-Jobs-Item a {
+  color: var(--ink) !important;
+}
+
+html.dark .BambooHR-ATS-Jobs-Item a:hover {
+  color: #A98BFF !important;
+}
+
+html.dark .BambooHR-ATS-Department-Header {
+  color: #A98BFF !important;
+}
+
+/* ── Tailwind v4 @theme ──────────────────────────── */
+@theme {
+  --color-violet:         #7B5EA7;
+  --color-violet-mid:     #9070BF;
+  --color-violet-deep:    #1E1230;
+  --color-lavender:       #B89FD8;
+  --color-lavender-soft:  #D4C4EC;
+  --color-teal:           #E8956D;
+  --color-teal-deep:      #D4784A;
+  --color-amber:          #D4A055;
+  --color-amber-soft:     #E8C07A;
+  --color-cream:          #F5F0EC;
+  --color-cream-dark:     #EDE5DC;
+  --color-ink:            #1E1230;
+  --color-ink-mid:        #332050;
+  --color-ink-soft:       #4A3468;
+  --color-muted:          #7A6E8A;
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body:    'Plus Jakarta Sans', system-ui, sans-serif;
+}
