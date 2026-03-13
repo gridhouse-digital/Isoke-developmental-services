@@ -376,6 +376,10 @@ html.dark .section-warm {
     width: 100% !important;
     justify-content: flex-start !important;
   }
+  .jobs-scroll-panel {
+    max-height: none !important;
+    overflow: visible !important;
+  }
 }
 
 /* Testimonials */
@@ -500,6 +504,11 @@ html.dark .about-img-overlay {
   background: linear-gradient(to top, rgba(18,13,42,0.65) 0%, transparent 55%) !important;
 }
 
+html.dark .careers-sync-note {
+  background: rgba(255,255,255,0.05) !important;
+  border-color: rgba(184,159,216,0.14) !important;
+}
+
 /* ══════════════════════════════════════════════════
    DARK SECTIONS — near-black mode override
    Hero, Services, Testimonials, Footer have
@@ -532,135 +541,37 @@ html.dark .dark-section > * {
    the site's design system
 ══════════════════════════════════════════════════ */
 
+/* When using iframe fallback, hide scrollbars but allow scroll */
+
 /* ── BambooHR embed overrides ─────────────────────── */
 
 /* Strip all background/border from the outer wrappers — only rows get cards */
-#BambooHR,
-#BambooHR-ATS,
-.BambooHR-ATS-board {
-  font-family: 'Plus Jakarta Sans', sans-serif !important;
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  padding: 0 !important;
-}
 
 /* Hide injected "Open Positions" heading — we have our own section heading */
-.BambooHR-ATS-board > h2,
-.BambooHR-ATS-board > div > h2,
-#BambooHR > h2 {
-  display: none !important;
-}
 
 /* Department label — same as original section label style */
-.BambooHR-ATS-Department-Header {
-  font-family: 'Plus Jakarta Sans', sans-serif !important;
-  font-size: 10px !important;
-  font-weight: 700 !important;
-  letter-spacing: 0.18em !important;
-  text-transform: uppercase !important;
-  color: #7B5EA7 !important;
-  padding: 20px 0 10px !important;
-  border: none !important;
-  background: transparent !important;
-}
-
-/* Strip list default styles */
-.BambooHR-ATS-Jobs-List {
-  list-style: none !important;
-  padding: 0 !important;
-  margin: 0 0 4px 0 !important;
-  border: none !important;
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 10px !important;
-}
 
 /* Each job = standalone card row */
-.BambooHR-ATS-Jobs-Item {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-  padding: 22px 28px !important;
-  border-radius: 18px !important;
-  background: rgba(255,255,255,0.85) !important;
-  border: 1px solid rgba(123,94,167,0.1) !important;
-  box-shadow: 0 2px 12px rgba(123,94,167,0.04) !important;
-  margin: 0 !important;
-  transition: transform 0.22s cubic-bezier(0.16,1,0.3,1), box-shadow 0.22s !important;
-  cursor: pointer !important;
-}
-
-.BambooHR-ATS-Jobs-Item:hover {
-  transform: translateX(6px) !important;
-  box-shadow: 0 4px 24px rgba(123,94,167,0.10) !important;
-  background: rgba(255,255,255,0.95) !important;
-}
 
 /* Job title link */
-.BambooHR-ATS-Jobs-Item a {
-  font-family: 'Plus Jakarta Sans', sans-serif !important;
-  font-size: 14px !important;
-  font-weight: 400 !important;
-  line-height: 1.4 !important;
-  color: var(--ink) !important;
-  text-decoration: none !important;
-  display: block !important;
-}
-
-.BambooHR-ATS-Jobs-Item a:hover {
-  color: #7B5EA7 !important;
-}
 
 /* Location — right-aligned, muted */
-.BambooHR-ATS-Location {
-  float: none !important;
-  font-size: 12px !important;
-  font-weight: 400 !important;
-  color: var(--muted) !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  flex-shrink: 0 !important;
-  padding-left: 24px !important;
-}
-
-.BambooHR-ATS-blankState {
-  font-size: 14px !important;
-  color: var(--muted) !important;
-  padding: 32px 0 !important;
-  text-align: center !important;
-}
 
 /* Hide "Powered by BambooHR" */
-#BambooHR-Footer,
-.BambooHR-ATS-board > p:last-child,
-.BambooHR-ATS-board a[href*="bamboohr.com/careers"]:not([href*="isokedevelops"]) {
-  display: none !important;
-}
-
-/* Dark mode overrides */
-html.dark .BambooHR-ATS-Jobs-Item {
-  background: rgba(255,255,255,0.05) !important;
-  border-color: rgba(169,139,255,0.15) !important;
-}
-
-html.dark .BambooHR-ATS-Jobs-Item:hover {
-  background: rgba(169,139,255,0.08) !important;
-}
-
-html.dark .BambooHR-ATS-Jobs-Item a {
-  color: var(--ink) !important;
-}
-
-html.dark .BambooHR-ATS-Jobs-Item a:hover {
-  color: #A98BFF !important;
-}
-
-html.dark .BambooHR-ATS-Department-Header {
-  color: #A98BFF !important;
-}
 
 /* ── Tailwind v4 @theme ──────────────────────────── */
+.jobs-scroll-panel {
+  max-height: min(44rem, 72vh);
+  overflow: auto;
+  padding-right: 6px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.jobs-scroll-panel::-webkit-scrollbar {
+  display: none;
+}
+
 @theme {
   --color-violet:         #7B5EA7;
   --color-violet-mid:     #9070BF;

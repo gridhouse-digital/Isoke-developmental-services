@@ -1,6 +1,6 @@
 import { FadeIn } from '../components/FadeIn';
 
-const ABOUT_IMAGE = 'https://images.unsplash.com/photo-1582750433449-648ed127bb54?w=1200&q=85&auto=format&fit=crop';
+const ABOUT_IMAGE = '/images/Licensed.jpg';
 
 export function About() {
   return (
@@ -120,9 +120,9 @@ export function About() {
 
               <p style={{ fontSize: 16, lineHeight: 1.85, color: 'var(--muted)', marginBottom: 22 }}>
                 <span style={{ fontWeight: 700, color: 'var(--ink)' }}>Our Mission:</span>{' '}
-                Rooted in compassion, dignity, and dedication. We work alongside
-                individuals and families to build customized, person-centered care plans that
-                foster community connections and champion independence at every stage of life.
+                Grounded in compassion, dignity, and dedication, we partner with individuals and
+                families to create customized, person-centered care plans that strengthen community
+                connections and promote independence at every stage of life.
               </p>
 
               <p style={{ fontSize: 16, lineHeight: 1.85, color: 'var(--muted)', marginBottom: 52 }}>

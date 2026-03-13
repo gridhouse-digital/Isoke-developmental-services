@@ -237,14 +237,14 @@ export function Testimonials() {
                 }} />
 
                 {/* Avatar + name */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
                   <img
                     src={current.avatarUrl}
                     alt={current.name}
                     style={{
-                      width: 56, height: 56, borderRadius: '50%', objectFit: 'cover',
+                      width: 64, height: 64, borderRadius: '50%', objectFit: 'cover',
                       border: '2px solid rgba(184,159,216,0.45)',
-                      boxShadow: '0 0 0 5px rgba(184,159,216,0.08)',
+                      boxShadow: '0 0 0 6px rgba(184,159,216,0.08)',
                       flexShrink: 0,
                     }}
                   />

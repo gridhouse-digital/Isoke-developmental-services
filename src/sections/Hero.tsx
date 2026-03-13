@@ -10,16 +10,22 @@ const SLIDES = [
     sub: 'Person-centered support for individuals with intellectual and developmental disabilities — building independence, dignity, and joy.',
   },
   {
-    image: 'https://images.unsplash.com/photo-1582750433449-648ed127bb54?w=1800&q=80&auto=format&fit=crop',
+    image: '/images/hero section 2.jpg',
     headline: 'Rooted in',
     accent: 'Compassion.',
     sub: 'Our team builds genuine, lasting relationships — treating every individual as the gift they truly are.',
   },
   {
-    image: 'https://images.unsplash.com/photo-1576765608622-067973a79f53?w=1800&q=80&auto=format&fit=crop',
+    image: '/images/hero section 3.jpg',
     headline: 'Building',
     accent: 'Independence.',
     sub: 'From in-home support to community participation — we walk alongside individuals at every stage of life.',
+  },
+  {
+    image: '/images/hero section 4.jpg',
+    headline: 'Care that',
+    accent: 'Feels Like Home.',
+    sub: 'Collaborative, trauma-informed support that centers each person’s strengths, culture, and goals.',
   },
 ];
 

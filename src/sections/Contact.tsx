@@ -111,8 +111,8 @@ export function Contact() {
                       <Icon size={13} style={{ color: '#7B5EA7', marginTop: 3, flexShrink: 0 }} />
                       {'lines' in item ? (
                         <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 4 }}>
-                          {item.lines.map(({ text, href }) => (
-                            <a key={href} href={href} style={{ fontSize: 14.5, color: '#7B5EA7', textDecoration: 'none', fontWeight: 500 }}>{text}</a>
+                          {item.lines.map(({ text, href }, idx) => (
+                            <a key={`${href}-${idx}`} href={href} style={{ fontSize: 14.5, color: '#7B5EA7', textDecoration: 'none', fontWeight: 500 }}>{text}</a>
                           ))}
                         </div>
                       ) : item.href ? (
