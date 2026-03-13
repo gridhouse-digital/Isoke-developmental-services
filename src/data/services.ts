@@ -29,7 +29,7 @@ export const services: Service[] = [
       'Peer relationship building',
     ],
     whoItHelps:
-      'Adults and youth with intellectual or developmental disabilities who want to build meaningful connections and participate actively in their communities.',
+      'Adults with intellectual or developmental disabilities who want to build meaningful connections and participate actively in their communities.',
     details:
       'Our Community Participation Support service is built around the belief that every person deserves a rich, connected life. We work alongside individuals to identify their interests — whether that\'s sports, the arts, volunteering, or simply exploring their neighborhood — and create structured opportunities to engage safely and confidently. Our trained staff provide one-on-one or small-group support, offering guidance and encouragement every step of the way. Over time, participants build independence, social confidence, and lasting friendships that extend well beyond our services.',
   },

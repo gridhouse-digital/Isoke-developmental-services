@@ -3,12 +3,18 @@ import { MapPin, Phone, Mail, Clock, Send, CheckCircle } from 'lucide-react';
 import { FadeIn } from '../components/FadeIn';
 
 const contactDetails = [
-  { icon: MapPin, label: 'Address',        value: '7924 Rolling Green Rd\nCheltenham, PA 19012' },
   {
-    icon: Phone, label: 'Phone',
+    icon: MapPin,
+    label: 'Address',
+    value: 'Isoke Developmental Services\n2061-63 N 62nd St, Suite A\nPhiladelphia, PA 19151',
+  },
+  {
+    icon: Phone,
+    label: 'Phone',
     lines: [
-      { text: '1-(844) ISOKE-13 / (844) 476-5313', href: 'tel:+18444765313' },
-      { text: 'After Hours: (267) 983-8856',        href: 'tel:+12679838856' },
+      { text: '1-(844) ISOKE-13', href: 'tel:+18444765313' },
+      { text: '1-(844) 476-5313', href: 'tel:+18444765313' },
+      { text: 'After Hours: (267) 983-8856', href: 'tel:+12679838856' },
     ],
   },
   { icon: Mail,   label: 'Email',          value: 'intake@isokedevelops.com', href: 'mailto:intake@isokedevelops.com' },

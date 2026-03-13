@@ -11,12 +11,30 @@ node_modules
 dist
 dist-ssr
 *.local
+.vite/
+.eslintcache
+*.tsbuildinfo
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Test artifacts
+coverage/
+*.lcov
+
+# Ignore CLAUDE doc on main branch (branch-specific policy)
+CLAUDE.md
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
 .idea
 .DS_Store
+Thumbs.db
+Desktop.ini
 *.suo
 *.ntvs*
 *.njsproj

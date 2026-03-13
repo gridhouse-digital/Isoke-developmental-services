@@ -109,11 +109,15 @@ export function Footer() {
           <div>
             <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' as const, color: '#B89FD8', marginBottom: 20 }}>Contact</p>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
-              <li style={{ fontSize: 13, lineHeight: 1.55, color: 'rgba(255,255,255,0.7)' }}>7924 Rolling Green Rd<br />Cheltenham, PA 19012</li>
+              <li style={{ fontSize: 13, lineHeight: 1.55, color: 'rgba(255,255,255,0.7)' }}>
+                Isoke Developmental Services<br />
+                2061-63 N 62nd St, Suite A<br />
+                Philadelphia, PA 19151
+              </li>
               <li><a href="tel:+18444765313" style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', textDecoration: 'none', transition: 'color 0.18s' }}
                 onMouseEnter={e => (e.currentTarget as HTMLAnchorElement).style.color = '#E8956D'}
                 onMouseLeave={e => (e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.7)'}
-              >(844) 476-5313</a></li>
+              >1-(844) 476-5313</a></li>
               <li><a href="mailto:intake@isokedevelops.com" style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', textDecoration: 'none', transition: 'color 0.18s' }}
                 onMouseEnter={e => (e.currentTarget as HTMLAnchorElement).style.color = '#E8956D'}
                 onMouseLeave={e => (e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.7)'}
