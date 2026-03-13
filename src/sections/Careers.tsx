@@ -7,101 +7,18 @@ import { jobs, bambooHRConfig } from '../data/jobs';
 
 const BAMBOO_SCRIPT_ID = 'bamboohr-embed-script';
 const BAMBOO_SRC = 'https://isokedevelops.bamboohr.com/js/embed.js';
-let bambooHRScriptPromise: Promise<void> | null = null;
 
-function loadBambooHRScript(): Promise<void> {
-  if (bambooHRScriptPromise) return bambooHRScriptPromise;
-
-  bambooHRScriptPromise = new Promise((resolve, reject) => {
-    const existing = document.getElementById(BAMBOO_SCRIPT_ID) as HTMLScriptElement | null;
-
-    if (existing) {
-      if (existing.dataset.loaded === 'true') {
-        resolve();
-        return;
-      }
-
-      existing.addEventListener('load', () => resolve(), { once: true });
-      existing.addEventListener('error', () => reject(new Error('Failed to load BambooHR script')), { once: true });
-      return;
-    }
+function BambooHREmbed() {
+  useEffect(() => {
+    // If script already added (e.g. from another page view), don't add again
+    if (document.getElementById(BAMBOO_SCRIPT_ID)) return;
 
     const script = document.createElement('script');
     script.id = BAMBOO_SCRIPT_ID;
     script.src = BAMBOO_SRC;
     script.async = true;
-    script.addEventListener('load', () => {
-      script.dataset.loaded = 'true';
-      resolve();
-    }, { once: true });
-    script.addEventListener('error', () => {
-      bambooHRScriptPromise = null;
-      reject(new Error('Failed to load BambooHR script'));
-    }, { once: true });
+    script.defer = true;
     document.body.appendChild(script);
-  });
-
-  return bambooHRScriptPromise;
-}
-
-function rerunBambooHRScript() {
-  const script = document.createElement('script');
-  script.src = BAMBOO_SRC;
-  script.async = true;
-  script.dataset.rerun = 'true';
-  script.addEventListener('load', () => script.remove(), { once: true });
-  script.addEventListener('error', () => script.remove(), { once: true });
-  document.body.appendChild(script);
-}
-
-function BambooHREmbed() {
-  useEffect(() => {
-    const container = document.getElementById('BambooHR');
-    if (!container) return;
-    let cancelled = false;
-    let observer: MutationObserver | null = null;
-
-    const openLinksInNewTab = () => {
-      container.querySelectorAll('a[href]').forEach((el) => {
-        const a = el as HTMLAnchorElement;
-        if (!a.target) {
-          a.target = '_blank';
-          a.rel = 'noopener noreferrer';
-        }
-      });
-    };
-
-    const dedupeBoards = () => {
-      const atsRoots = Array.from(container.querySelectorAll('#BambooHR-ATS'));
-      atsRoots.slice(1).forEach((node) => node.remove());
-
-      const boards = Array.from(container.querySelectorAll('.BambooHR-ATS-board'));
-      boards.slice(1).forEach((node) => node.remove());
-
-      openLinksInNewTab();
-    };
-
-    const hasBoard = () =>
-      Boolean(container.querySelector('#BambooHR-ATS, .BambooHR-ATS-board'));
-
-    loadBambooHRScript()
-      .then(() => {
-        if (cancelled) return;
-        if (!hasBoard()) {
-          rerunBambooHRScript();
-        }
-        dedupeBoards();
-        observer = new MutationObserver(dedupeBoards);
-        observer.observe(container, { childList: true, subtree: true });
-      })
-      .catch(() => {
-        bambooHRScriptPromise = null;
-      });
-
-    return () => {
-      cancelled = true;
-      observer?.disconnect();
-    };
   }, []);
 
   return (
@@ -109,7 +26,8 @@ function BambooHREmbed() {
       id="BambooHR"
       data-domain="isokedevelops.bamboohr.com"
       data-version="1.0.0"
-      data-departmentid=""
+      data-departmentId=""
+      style={{ width: '100%', minHeight: 600 }}
     />
   );
 }
