@@ -1,28 +1,45 @@
-import { useState, useRef, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
 import { MessageCircle, X } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 
-const QUICK_REPLIES = [
-  'What services do you offer?',
-  'How can I contact you?',
-  "I'd like to request a callback",
+const WELCOME_ACTIONS = [
+  {
+    label: 'Explore services',
+    description: 'See the kinds of support Isoke provides.',
+    text: 'What services do you offer?',
+  },
+  {
+    label: 'Talk to someone',
+    description: 'Start a callback request with our team.',
+    text: "I'd like to request a callback",
+  },
+  {
+    label: 'Get contact info',
+    description: 'Find the best number, email, and hours.',
+    text: 'How can I contact you?',
+  },
 ]
 
 const OPEN_CHAT_EVENT = 'isoke-open-chat'
+const ASSISTANT_REVEAL_MS = 20
+const ASSISTANT_REVEAL_CHARS = 2
 
 function messageText(parts: Array<{ type: string; text?: string }>): string {
   return (parts || [])
-    .filter((p): p is { type: 'text'; text: string } => p.type === 'text' && 'text' in p)
-    .map((p) => p.text)
+    .filter((part): part is { type: 'text'; text: string } => part.type === 'text' && 'text' in part)
+    .map((part) => part.text)
     .join('')
 }
 
 export function ChatWidget() {
   const [open, setOpen] = useState(false)
   const [input, setInput] = useState('')
+  const [revealedAssistantText, setRevealedAssistantText] = useState<Record<string, string>>({})
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const revealTimersRef = useRef<Record<string, ReturnType<typeof window.setInterval>>>({})
+  const assistantTargetsRef = useRef<Record<string, string>>({})
 
   useEffect(() => {
     const handler = () => setOpen(true)
@@ -37,7 +54,54 @@ export function ChatWidget() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, revealedAssistantText])
+
+  useEffect(() => {
+    const activeMessageIds = new Set(messages.map((message) => message.id))
+
+    messages.forEach((message) => {
+      if (message.role !== 'assistant') return
+
+      const fullText = messageText(message.parts)
+      assistantTargetsRef.current[message.id] = fullText
+
+      if (!fullText) return
+      if (revealTimersRef.current[message.id]) return
+      if ((revealedAssistantText[message.id] ?? '').length >= fullText.length) return
+
+      revealTimersRef.current[message.id] = window.setInterval(() => {
+        setRevealedAssistantText((current) => {
+          const targetText = assistantTargetsRef.current[message.id] ?? ''
+          const currentText = current[message.id] ?? ''
+
+          if (currentText.length >= targetText.length) {
+            window.clearInterval(revealTimersRef.current[message.id])
+            delete revealTimersRef.current[message.id]
+            return currentText === targetText ? current : { ...current, [message.id]: targetText }
+          }
+
+          return {
+            ...current,
+            [message.id]: targetText.slice(0, currentText.length + ASSISTANT_REVEAL_CHARS),
+          }
+        })
+      }, ASSISTANT_REVEAL_MS)
+    })
+
+    Object.keys(revealTimersRef.current).forEach((messageId) => {
+      if (!activeMessageIds.has(messageId)) {
+        window.clearInterval(revealTimersRef.current[messageId])
+        delete revealTimersRef.current[messageId]
+        delete assistantTargetsRef.current[messageId]
+      }
+    })
+  }, [messages, revealedAssistantText])
+
+  useEffect(() => {
+    return () => {
+      Object.values(revealTimersRef.current).forEach((timerId) => window.clearInterval(timerId))
+    }
+  }, [])
 
   const onQuickReply = (text: string) => {
     sendMessage({ text })
@@ -45,10 +109,10 @@ export function ChatWidget() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    const t = input.trim()
-    if (!t || isLoading) return
+    const text = input.trim()
+    if (!text || isLoading) return
     setInput('')
-    sendMessage({ text: t })
+    sendMessage({ text })
   }
 
   return (
@@ -75,11 +139,11 @@ export function ChatWidget() {
           boxShadow: '0 4px 20px rgba(123,94,167,0.4)',
           fontFamily: 'var(--font-body)',
         }}
-        onMouseEnter={e => {
+        onMouseEnter={(e) => {
           e.currentTarget.style.background = 'var(--violet-mid)'
           e.currentTarget.style.boxShadow = '0 6px 28px rgba(123,94,167,0.5)'
         }}
-        onMouseLeave={e => {
+        onMouseLeave={(e) => {
           e.currentTarget.style.background = 'var(--violet)'
           e.currentTarget.style.boxShadow = '0 4px 20px rgba(123,94,167,0.4)'
         }}
@@ -151,23 +215,118 @@ export function ChatWidget() {
               }}
             >
               {messages.length === 0 && (
-                <p style={{ color: 'var(--muted)', fontSize: 14, marginBottom: 8 }}>
-                  Ask about our services, hours, or request a callback.
-                </p>
-              )}
-              {messages.map((m) => (
-                <div
-                  key={m.id}
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, ease: 'easeOut' }}
                   style={{
-                    alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
-                    maxWidth: '88%',
-                    padding: '10px 14px',
-                    borderRadius: 12,
-                    fontSize: 14,
-                    lineHeight: 1.5,
+                    alignSelf: 'flex-start',
+                    maxWidth: '94%',
+                    marginBottom: 4,
+                    padding: '14px 16px 16px',
+                    borderRadius: 18,
+                    background:
+                      'linear-gradient(180deg, rgba(255,255,255,0.8) 0%, rgba(212,196,236,0.18) 100%)',
+                    border: '1px solid rgba(123,94,167,0.16)',
+                    boxShadow: '0 12px 30px rgba(30,18,48,0.08)',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      marginBottom: 10,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, var(--teal) 0%, var(--violet) 100%)',
+                        boxShadow: '0 0 0 4px rgba(232,149,109,0.12)',
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        letterSpacing: '0.14em',
+                        textTransform: 'uppercase',
+                        color: 'var(--muted)',
+                      }}
+                    >
+                      Welcome
+                    </span>
+                  </div>
+
+                  <div
+                    style={{
+                      color: 'var(--ink)',
+                      fontSize: 15,
+                      lineHeight: 1.72,
+                      letterSpacing: '0.005em',
+                      marginBottom: 14,
+                    }}
+                  >
+                    Hi, I&apos;m Isoke&apos;s virtual assistant. I can help you explore services, find contact
+                    information, or start a callback request.
+                  </div>
+
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    {WELCOME_ACTIONS.map((action) => (
+                      <button
+                        key={action.label}
+                        type="button"
+                        onClick={() => onQuickReply(action.text)}
+                        style={{
+                          textAlign: 'left',
+                          padding: '12px 14px',
+                          borderRadius: 14,
+                          border: '1px solid rgba(123,94,167,0.14)',
+                          background: 'rgba(255,255,255,0.56)',
+                          color: 'var(--ink)',
+                          cursor: 'pointer',
+                          transition: 'transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease',
+                          boxShadow: '0 4px 14px rgba(30,18,48,0.04)',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-1px)'
+                          e.currentTarget.style.borderColor = 'rgba(123,94,167,0.28)'
+                          e.currentTarget.style.boxShadow = '0 10px 20px rgba(30,18,48,0.08)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)'
+                          e.currentTarget.style.borderColor = 'rgba(123,94,167,0.14)'
+                          e.currentTarget.style.boxShadow = '0 4px 14px rgba(30,18,48,0.04)'
+                        }}
+                      >
+                        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 3 }}>{action.label}</div>
+                        <div style={{ fontSize: 12, lineHeight: 1.55, color: 'var(--muted)' }}>
+                          {action.description}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+
+              {messages.map((message) => (
+                <div
+                  key={message.id}
+                  style={{
+                    alignSelf: message.role === 'user' ? 'flex-end' : 'flex-start',
+                    maxWidth: '90%',
+                    padding: message.role === 'assistant' ? '12px 16px' : '10px 14px',
+                    borderRadius: 14,
+                    fontSize: message.role === 'assistant' ? 15 : 14,
+                    lineHeight: message.role === 'assistant' ? 1.72 : 1.58,
+                    letterSpacing: message.role === 'assistant' ? '0.005em' : '0.01em',
                     whiteSpace: 'pre-wrap',
                     wordBreak: 'break-word',
-                    ...(m.role === 'user'
+                    ...(message.role === 'user'
                       ? {
                           background: 'var(--violet)',
                           color: 'white',
@@ -179,51 +338,33 @@ export function ChatWidget() {
                         }),
                   }}
                 >
-                  {messageText(m.parts)}
+                  {message.role === 'assistant'
+                    ? revealedAssistantText[message.id] ?? ''
+                    : messageText(message.parts)}
                 </div>
               ))}
+
               {isLoading && messages[messages.length - 1]?.role === 'user' && (
                 <div
                   style={{
                     alignSelf: 'flex-start',
-                    padding: '10px 14px',
-                    borderRadius: 12,
+                    padding: '12px 16px',
+                    borderRadius: 14,
                     background: 'var(--input-bg)',
                     border: '1px solid var(--input-border)',
                     color: 'var(--muted)',
-                    fontSize: 14,
+                    fontSize: 15,
+                    letterSpacing: '0.12em',
                   }}
                 >
-                  …
+                  ...
                 </div>
               )}
+
               <div ref={messagesEndRef} />
             </div>
 
             <div style={{ padding: 12, borderTop: '1px solid var(--card-border)' }}>
-              {messages.length === 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-                  {QUICK_REPLIES.map((text) => (
-                    <button
-                      key={text}
-                      type="button"
-                      onClick={() => onQuickReply(text)}
-                      style={{
-                        padding: '8px 12px',
-                        borderRadius: 20,
-                        border: '1px solid var(--input-border)',
-                        background: 'var(--input-bg)',
-                        color: 'var(--ink)',
-                        fontSize: 13,
-                        cursor: 'pointer',
-                        fontFamily: 'inherit',
-                      }}
-                    >
-                      {text}
-                    </button>
-                  ))}
-                </div>
-              )}
               <form
                 id="chat-form"
                 onSubmit={handleSubmit}
@@ -233,7 +374,7 @@ export function ChatWidget() {
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Type a message…"
+                  placeholder="Type a message..."
                   disabled={isLoading}
                   style={{
                     flex: 1,
@@ -243,6 +384,8 @@ export function ChatWidget() {
                     background: 'var(--input-bg)',
                     color: 'var(--ink)',
                     fontSize: 14,
+                    lineHeight: 1.5,
+                    letterSpacing: '0.01em',
                     fontFamily: 'inherit',
                     outline: 'none',
                   }}

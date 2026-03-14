@@ -1,8 +1,7 @@
 import { createServer } from 'node:http'
 import { readFileSync, existsSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { streamText } from 'ai'
-import { gateway } from '@ai-sdk/gateway'
+import { convertToModelMessages, gateway, streamText } from 'ai'
 
 const ISOKE_SYSTEM_PROMPT = `You are the friendly, professional voice of Isoke Developmental Services. Isoke provides person-centered support for adults with intellectual and developmental disabilities (IDD) across Pennsylvania.
 
@@ -39,7 +38,17 @@ function loadEnv() {
   const content = readFileSync(envPath, 'utf8')
   content.split('\n').forEach((line) => {
     const m = line.match(/^([^#=]+)=(.*)$/)
-    if (m) process.env[m[1].trim()] = m[2].trim().replace(/^["']|["']$/g, '')
+    if (!m) return
+    const key = m[1].trim()
+    const rawValue = m[2].trim()
+
+    if (rawValue.startsWith('"') || rawValue.startsWith("'")) {
+      process.env[key] = rawValue.replace(/^["']|["']$/g, '')
+      return
+    }
+
+    const commentIndex = rawValue.search(/\s#/)
+    process.env[key] = (commentIndex >= 0 ? rawValue.slice(0, commentIndex) : rawValue).trim()
   })
 }
 
@@ -48,7 +57,7 @@ async function handleChat(body) {
   const result = streamText({
     model: gateway('openai/gpt-4o-mini'),
     system: ISOKE_SYSTEM_PROMPT,
-    messages: messages.map((m) => ({ role: m.role, content: m.content })),
+    messages: convertToModelMessages(messages),
   })
   return result.toUIMessageStreamResponse()
 }

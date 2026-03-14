@@ -1,5 +1,4 @@
-import { streamText } from 'ai'
-import { gateway } from '@ai-sdk/gateway'
+import { convertToModelMessages, gateway, streamText } from 'ai'
 
 const ISOKE_SYSTEM_PROMPT = `You are the friendly, professional voice of Isoke Developmental Services. Isoke provides person-centered support for adults with intellectual and developmental disabilities (IDD) across Pennsylvania.
 
@@ -40,11 +39,11 @@ export async function POST(req: Request) {
     })
   }
   try {
-    const { messages } = (await req.json()) as { messages: Array<{ role: string; content: string }> }
+    const { messages } = (await req.json()) as { messages: unknown[] }
     const result = streamText({
       model: gateway('openai/gpt-4o-mini'),
       system: ISOKE_SYSTEM_PROMPT,
-      messages: messages.map((m) => ({ role: m.role as 'user' | 'assistant' | 'system', content: m.content })),
+      messages: convertToModelMessages(messages),
     })
     return result.toUIMessageStreamResponse()
   } catch (e) {
