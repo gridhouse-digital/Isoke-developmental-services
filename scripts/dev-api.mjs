@@ -34,6 +34,7 @@ If the user wants a callback, or mentions that they tried calling and did not ge
 Warm, clear, professional. If you do not know something, direct them to call 1-(844) 476-5313, use the after-hours number (267) 983-8856 when relevant, or email intake@isokedevelops.com. Keep answers concise but helpful.`
 
 const RESEND_API_URL = 'https://api.resend.com/emails'
+const DEFAULT_CALLBACK_EMAIL_FROM = 'intake@callback.isokedevelops.com'
 
 function loadEnv() {
   const envPath = resolve(process.cwd(), '.env')
@@ -64,6 +65,14 @@ function escapeHtml(value) {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;')
+}
+
+function normalizeEnvValue(value) {
+  return value?.replace(/\r?\n/g, '').trim() ?? ''
+}
+
+function normalizeEmailAddress(value) {
+  return normalizeEnvValue(value).replace(/\s+/g, '')
 }
 
 function formatCallbackEmailHtml(payload) {
@@ -110,10 +119,10 @@ function formatCallbackEmailText(payload) {
 }
 
 async function sendCallbackEmail(payload) {
-  const apiKey = process.env.RESEND_API_KEY
-  const to = process.env.CALLBACK_EMAIL_TO
-  const from = process.env.CALLBACK_EMAIL_FROM
-  const replyTo = process.env.CALLBACK_EMAIL_REPLY_TO
+  const apiKey = normalizeEnvValue(process.env.RESEND_API_KEY)
+  const to = normalizeEmailAddress(process.env.CALLBACK_EMAIL_TO)
+  const from = normalizeEmailAddress(process.env.CALLBACK_EMAIL_FROM) || DEFAULT_CALLBACK_EMAIL_FROM
+  const replyTo = normalizeEmailAddress(process.env.CALLBACK_EMAIL_REPLY_TO)
 
   if (!apiKey || !to || !from) {
     return { ok: false, reason: 'email_not_configured' }
