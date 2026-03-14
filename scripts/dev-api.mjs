@@ -2,6 +2,7 @@ import { createServer } from 'node:http'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { convertToModelMessages, gateway, streamText } from 'ai'
+import { Resend } from 'resend'
 
 const ISOKE_SYSTEM_PROMPT = `You are the friendly, professional voice of Isoke Developmental Services. Isoke provides person-centered support for adults with intellectual and developmental disabilities (IDD) across Pennsylvania.
 
@@ -33,7 +34,6 @@ If the user wants a callback, or mentions that they tried calling and did not ge
 **Tone**
 Warm, clear, professional. If you do not know something, direct them to call 1-(844) 476-5313, use the after-hours number (267) 983-8856 when relevant, or email intake@isokedevelops.com. Keep answers concise but helpful.`
 
-const RESEND_API_URL = 'https://api.resend.com/emails'
 const DEFAULT_CALLBACK_EMAIL_FROM = 'intake@callback.isokedevelops.com'
 
 function loadEnv() {
@@ -128,30 +128,18 @@ async function sendCallbackEmail(payload) {
     return { ok: false, reason: 'email_not_configured' }
   }
 
-  const idempotencyKey = `callback-${payload.phone.replace(/\D/g, '')}-${payload.bestTime
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')}`
-
-  const res = await fetch(RESEND_API_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'Idempotency-Key': idempotencyKey,
-    },
-    body: JSON.stringify({
-      from,
-      to: [to],
-      subject: `New callback request from ${payload.name}`,
-      html: formatCallbackEmailHtml(payload),
-      text: formatCallbackEmailText(payload),
-      ...(replyTo ? { reply_to: replyTo } : {}),
-    }),
+  const resend = new Resend(apiKey)
+  const response = await resend.emails.send({
+    from,
+    to: [to],
+    subject: `New callback request from ${payload.name}`,
+    html: formatCallbackEmailHtml(payload),
+    text: formatCallbackEmailText(payload),
+    ...(replyTo ? { replyTo } : {}),
   })
 
-  if (!res.ok) {
-    const errorBody = await res.text()
-    throw new Error(`Resend email failed: ${res.status} ${errorBody}`)
+  if (response.error) {
+    throw new Error(`Resend email failed: ${response.error.message}`)
   }
 
   return { ok: true }
