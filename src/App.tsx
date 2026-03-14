@@ -8,6 +8,7 @@ import { AboutPage } from './pages/AboutPage';
 import { ServicesPage } from './pages/ServicesPage';
 import { CareersPage } from './pages/CareersPage';
 import { ContactPage } from './pages/ContactPage';
+import { ChatWidget } from './components/ChatWidget';
 import { initTheme, toggleTheme } from './lib/utils';
 
 function ScrollToTop() {
@@ -91,6 +92,7 @@ function AppLayout() {
       </div>
       <Footer />
       <BackToTopButton />
+      <ChatWidget />
     </div>
   );
 }
