@@ -303,6 +303,26 @@ export function Services() {
 
               {/* Body */}
               <div style={{ padding: '36px 40px 48px', flex: 1 }}>
+                {selected.image && (
+                  <div style={{
+                    borderRadius: 16,
+                    overflow: 'hidden',
+                    marginBottom: 28,
+                    border: `1px solid ${selected.accentColor}25`,
+                  }}>
+                    <img
+                      src={selected.image}
+                      alt=""
+                      style={{
+                        width: '100%',
+                        height: 'auto',
+                        maxHeight: 220,
+                        objectFit: 'cover',
+                        display: 'block',
+                      }}
+                    />
+                  </div>
+                )}
 
                 {/* Full description */}
                 <p style={{

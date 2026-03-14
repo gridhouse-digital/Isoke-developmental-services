@@ -6,6 +6,7 @@ export interface Service {
   description: string;
   color: string;
   accentColor: string;
+  image?: string;
   highlights: string[];
   whoItHelps: string;
   details: string;
@@ -16,6 +17,7 @@ export const services: Service[] = [
     id: 'community-participation',
     icon: 'Users',
     title: 'Community Participation Support',
+    image: '/images/Services/Community Participation Support.png',
     tagline: 'Connecting people to the world around them.',
     description:
       'Engage in inclusive, interest-based community activities that reflect personal strengths and goals. Promotes connection and skill-building.',
@@ -37,6 +39,7 @@ export const services: Service[] = [
     id: 'companion-services',
     icon: 'Heart',
     title: 'Companion Services',
+    image: '/images/Services/Companion Services.png',
     tagline: 'Everyday support, delivered with dignity.',
     description:
       'Support for adults in private homes: daily living tasks, social engagement, medication reminders, and mobility assistance.',
@@ -58,6 +61,7 @@ export const services: Service[] = [
     id: 'shift-nursing',
     icon: 'Stethoscope',
     title: 'Shift Nursing',
+    image: '/images/Services/shift-nursing.png',
     tagline: 'Clinical expertise, brought home.',
     description:
       'Licensed nurses deliver in-home medical care: medication management, vital sign monitoring, and wellness support.',
@@ -79,6 +83,7 @@ export const services: Service[] = [
     id: 'in-home-community-support',
     icon: 'Home',
     title: 'In-Home Community Support',
+    image: '/images/Services/In-Home-Community Support.png',
     tagline: 'Building the skills to thrive independently.',
     description:
       'Skills for independent living: self-care, communication, safety, finances, and social skills integration.',
@@ -100,6 +105,7 @@ export const services: Service[] = [
     id: 'respite-services',
     icon: 'RefreshCw',
     title: 'Respite Services',
+    image: '/images/Services/Respite Services.png',
     tagline: 'Rest for caregivers. Continuity for individuals.',
     description:
       'Short-term care to give caregivers a break. Ensures continuity, safety, and peace of mind for families.',
@@ -121,6 +127,7 @@ export const services: Service[] = [
     id: 'transportation',
     icon: 'Car',
     title: 'Transportation Services',
+    image: '/images/Services/Transportation Services.png',
     tagline: 'More than a ride — freedom and opportunity.',
     description:
       'Reliable, trauma-informed transport for medical, work, or community access. More than a ride — freedom and opportunity.',

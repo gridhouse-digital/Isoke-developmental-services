@@ -4,25 +4,25 @@ import { ArrowRight, Users } from 'lucide-react';
 
 const SLIDES = [
   {
-    image: '/images/hero section.jpg',
+    image: '/images/1.png',
     headline: 'Empowering',
     accent: 'Every Ability.',
     sub: 'Person-centered support for individuals with intellectual and developmental disabilities — building independence, dignity, and joy.',
   },
   {
-    image: '/images/hero section 2.jpg',
+    image: '/images/2.png',
     headline: 'Rooted in',
     accent: 'Compassion.',
     sub: 'Our team builds genuine, lasting relationships — treating every individual as the gift they truly are.',
   },
   {
-    image: '/images/hero section 3.jpg',
+    image: '/images/3.png',
     headline: 'Building',
     accent: 'Independence.',
     sub: 'From in-home support to community participation — we walk alongside individuals at every stage of life.',
   },
   {
-    image: '/images/hero section 4.jpg',
+    image: '/images/4.jpeg',
     headline: 'Care that',
     accent: 'Feels Like Home.',
     sub: 'Collaborative, trauma-informed support that centers each person’s strengths, culture, and goals.',
