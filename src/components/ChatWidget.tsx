@@ -51,106 +51,23 @@ type CallbackNotice = {
   text: string
 }
 
-function cleanCapturedValue(value: string) {
-  return value.trim().replace(/^[\s:,-]+/, '').replace(/[.,;!?]+$/, '').trim()
-}
-
-function extractName(text: string) {
-  const patterns = [
-    /\bname\s*(?:is|:)\s*([a-z][a-z'.-]+(?:\s+[a-z][a-z'.-]+){0,3})/i,
-    /\b(?:i am|i'm|this is)\s+([a-z][a-z'.-]+(?:\s+[a-z][a-z'.-]+){0,3})/i,
-  ]
-
-  for (const pattern of patterns) {
-    const match = text.match(pattern)
-    if (match?.[1]) return cleanCapturedValue(match[1])
-  }
-
-  const bareName = text.trim()
-  if (
-    /^[a-z][a-z'.-]+(?:\s+[a-z][a-z'.-]+){1,3}$/i.test(bareName) &&
-    !/\b(callback|call|phone|service|time|morning|afternoon|evening|am|pm)\b/i.test(bareName)
-  ) {
-    return cleanCapturedValue(bareName)
-  }
-
-  return ''
-}
-
-function extractPhone(text: string) {
-  const match = text.match(/(?:\+?1[\s.-]*)?(?:\(\s*\d{3}\s*\)|\d{3})[\s.-]*\d{3}[\s.-]*\d{4}/)
-  return match?.[0] ? cleanCapturedValue(match[0]) : ''
-}
-
-function extractBestTime(text: string) {
-  const explicitPatterns = [
-    /\bbest time(?: to call)?\s*(?:is|:)?\s*([^\n.!?]+)/i,
-    /\bcall me back\s*([^\n.!?]+)/i,
-    /\bcall me\s+(?:around|after|before|at)\s*([^\n.!?]+)/i,
-    /\breach me\s+(?:around|after|before|at)\s*([^\n.!?]+)/i,
-  ]
-
-  for (const pattern of explicitPatterns) {
-    const match = text.match(pattern)
-    if (match?.[1]) return cleanCapturedValue(match[1])
-  }
-
-  if (/\b(anytime|tomorrow|morning|afternoon|evening|weekday|weekdays|weekend|after\s+\d|before\s+\d|\d{1,2}\s?(?:am|pm))\b/i.test(text)) {
-    return cleanCapturedValue(text)
-  }
-
-  return ''
-}
-
 function extractService(text: string) {
   const lowered = text.toLowerCase()
   const matched = CALLBACK_SERVICE_OPTIONS.find((service) => lowered.includes(service.toLowerCase()))
   return matched ?? ''
 }
 
-function extractCallbackDetails(
-  messages: Array<{ parts: Array<{ text?: string; type: string }>; role: string }>,
-): CallbackDetails {
-  const details: CallbackDetails = {
-    bestTime: '',
-    name: '',
-    phone: '',
-    service: '',
-  }
-
-  messages.forEach((message) => {
-    if (message.role !== 'user') return
-
-    const text = messageText(message.parts)
-    if (!text) return
-
-    const name = extractName(text)
-    const phone = extractPhone(text)
-    const bestTime = extractBestTime(text)
-    const service = extractService(text)
-
-    if (name) details.name = name
-    if (phone) details.phone = phone
-    if (bestTime) details.bestTime = bestTime
-    if (service) details.service = service
-  })
-
-  return details
-}
-
 function hasCallbackContext(messages: Array<{ parts: Array<{ text?: string; type: string }>; role: string }>) {
   return messages.some((message) => CALLBACK_CONTEXT_RE.test(messageText(message.parts)))
 }
 
-function getReadyCallbackDetails(
-  messages: Array<{ parts: Array<{ text?: string; type: string }>; role: string }>,
-) {
-  if (!hasCallbackContext(messages)) return null
+function inferCallbackService(messages: Array<{ parts: Array<{ text?: string; type: string }>; role: string }>) {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const service = extractService(messageText(messages[index].parts))
+    if (service) return service
+  }
 
-  const details = extractCallbackDetails(messages)
-  if (!details.name || !details.phone || !details.bestTime) return null
-
-  return details
+  return ''
 }
 
 function messageText(parts: Array<{ type: string; text?: string }>): string {
@@ -163,12 +80,20 @@ function messageText(parts: Array<{ type: string; text?: string }>): string {
 export function ChatWidget() {
   const [open, setOpen] = useState(false)
   const [input, setInput] = useState('')
+  const [showCallbackForm, setShowCallbackForm] = useState(false)
+  const [callbackSubmitting, setCallbackSubmitting] = useState(false)
+  const [callbackForm, setCallbackForm] = useState<CallbackDetails>({
+    bestTime: '',
+    name: '',
+    phone: '',
+    service: '',
+  })
   const [callbackNotice, setCallbackNotice] = useState<CallbackNotice | null>(null)
   const [revealedAssistantText, setRevealedAssistantText] = useState<Record<string, string>>({})
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const revealTimersRef = useRef<Record<string, ReturnType<typeof window.setInterval>>>({})
   const assistantTargetsRef = useRef<Record<string, string>>({})
-  const submittedCallbackKeysRef = useRef(new Set<string>())
 
   useEffect(() => {
     const handler = () => setOpen(true)
@@ -233,63 +158,107 @@ export function ChatWidget() {
   }, [])
 
   useEffect(() => {
-    const callbackDetails = getReadyCallbackDetails(messages)
-    if (!callbackDetails?.name || !callbackDetails.phone || !callbackDetails.bestTime) return
+    if (callbackNotice?.tone === 'success') return
+    if (!hasCallbackContext(messages)) return
 
-    const submissionKey = JSON.stringify(callbackDetails)
-    if (submittedCallbackKeysRef.current.has(submissionKey)) return
+    setShowCallbackForm(true)
 
-    submittedCallbackKeysRef.current.add(submissionKey)
-
-    let cancelled = false
-
-    const submitCallback = async () => {
-      try {
-        const response = await fetch(CALLBACK_API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(callbackDetails),
-        })
-
-        const data = (await response.json().catch(() => null)) as { error?: string } | null
-        if (!response.ok) {
-          throw new Error(data?.error ?? 'Callback request failed')
-        }
-
-        if (!cancelled) {
-          setCallbackNotice({
-            text: 'Callback details sent to the Isoke team.',
-            tone: 'success',
-          })
-        }
-      } catch (error) {
-        if (!cancelled) {
-          console.error(error)
-          setCallbackNotice({
-            text: 'We could not send the callback request automatically. Please call 1-(844) 476-5313.',
-            tone: 'error',
-          })
-        }
-      }
-    }
-
-    void submitCallback()
-
-    return () => {
-      cancelled = true
+    const inferredService = inferCallbackService(messages)
+    if (inferredService) {
+      setCallbackForm((current) => (current.service ? current : { ...current, service: inferredService }))
     }
   }, [messages])
+
+  useEffect(() => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+
+    textarea.style.height = '0px'
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 132)}px`
+  }, [input, open])
 
   const onQuickReply = (text: string) => {
     sendMessage({ text })
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+  const submitInput = () => {
     const text = input.trim()
-    if (!text || isLoading) return
+    if (!text || isLoading) return false
     setInput('')
     sendMessage({ text })
+    return true
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    submitInput()
+  }
+
+  const handleComposerKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key !== 'Enter' || e.shiftKey) return
+
+    e.preventDefault()
+    submitInput()
+  }
+
+  const handleCallbackFieldChange = (field: keyof CallbackDetails, value: string) => {
+    setCallbackForm((current) => ({ ...current, [field]: value }))
+    if (callbackNotice?.tone === 'error') setCallbackNotice(null)
+  }
+
+  const handleCallbackSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    const payload = {
+      bestTime: callbackForm.bestTime.trim(),
+      name: callbackForm.name.trim(),
+      phone: callbackForm.phone.trim(),
+      service: callbackForm.service.trim(),
+    }
+
+    if (!payload.name || !payload.phone || !payload.bestTime) {
+      setCallbackNotice({
+        text: 'Please enter your name, phone number, and best time to call.',
+        tone: 'error',
+      })
+      return
+    }
+
+    setCallbackSubmitting(true)
+    setCallbackNotice(null)
+
+    try {
+      const response = await fetch(CALLBACK_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      const data = (await response.json().catch(() => null)) as { error?: string } | null
+      if (!response.ok) {
+        throw new Error(data?.error ?? 'Callback request failed')
+      }
+
+      setCallbackNotice({
+        text: 'Callback details sent to the Isoke team.',
+        tone: 'success',
+      })
+      setShowCallbackForm(false)
+      setCallbackForm({
+        bestTime: '',
+        name: '',
+        phone: '',
+        service: '',
+      })
+    } catch (error) {
+      console.error(error)
+      setCallbackNotice({
+        text: 'We could not send the callback request automatically. Please call 1-(844) 476-5313.',
+        tone: 'error',
+      })
+    } finally {
+      setCallbackSubmitting(false)
+    }
   }
 
   return (
@@ -538,6 +507,124 @@ export function ChatWidget() {
                 </div>
               )}
 
+              {showCallbackForm && (
+                <div
+                  style={{
+                    alignSelf: 'flex-start',
+                    maxWidth: '94%',
+                    padding: '14px 16px',
+                    borderRadius: 18,
+                    background: 'rgba(255,255,255,0.82)',
+                    border: '1px solid rgba(123,94,167,0.18)',
+                    boxShadow: '0 12px 30px rgba(30,18,48,0.08)',
+                  }}
+                >
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>
+                    Request a callback
+                  </div>
+                  <div style={{ fontSize: 12, lineHeight: 1.55, color: 'var(--muted)', marginBottom: 12 }}>
+                    Share your details here and the Isoke team will follow up.
+                  </div>
+
+                  <form onSubmit={handleCallbackSubmit} style={{ display: 'grid', gap: 10 }}>
+                    <input
+                      type="text"
+                      value={callbackForm.name}
+                      onChange={(e) => handleCallbackFieldChange('name', e.target.value)}
+                      placeholder="Your name"
+                      disabled={callbackSubmitting}
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: 12,
+                        border: '1px solid var(--input-border)',
+                        background: 'var(--input-bg)',
+                        color: 'var(--ink)',
+                        fontSize: 14,
+                        fontFamily: 'inherit',
+                        outline: 'none',
+                      }}
+                    />
+                    <input
+                      type="tel"
+                      value={callbackForm.phone}
+                      onChange={(e) => handleCallbackFieldChange('phone', e.target.value)}
+                      placeholder="Phone number"
+                      disabled={callbackSubmitting}
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: 12,
+                        border: '1px solid var(--input-border)',
+                        background: 'var(--input-bg)',
+                        color: 'var(--ink)',
+                        fontSize: 14,
+                        fontFamily: 'inherit',
+                        outline: 'none',
+                      }}
+                    />
+                    <textarea
+                      value={callbackForm.bestTime}
+                      onChange={(e) => handleCallbackFieldChange('bestTime', e.target.value)}
+                      placeholder="Best time to call"
+                      disabled={callbackSubmitting}
+                      rows={2}
+                      style={{
+                        minHeight: 72,
+                        padding: '10px 12px',
+                        borderRadius: 12,
+                        border: '1px solid var(--input-border)',
+                        background: 'var(--input-bg)',
+                        color: 'var(--ink)',
+                        fontSize: 14,
+                        lineHeight: 1.5,
+                        fontFamily: 'inherit',
+                        outline: 'none',
+                        resize: 'vertical',
+                      }}
+                    />
+                    <select
+                      value={callbackForm.service}
+                      onChange={(e) => handleCallbackFieldChange('service', e.target.value)}
+                      disabled={callbackSubmitting}
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: 12,
+                        border: '1px solid var(--input-border)',
+                        background: 'var(--input-bg)',
+                        color: 'var(--ink)',
+                        fontSize: 14,
+                        fontFamily: 'inherit',
+                        outline: 'none',
+                      }}
+                    >
+                      <option value="">Service of interest (optional)</option>
+                      {CALLBACK_SERVICE_OPTIONS.map((service) => (
+                        <option key={service} value={service}>
+                          {service}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="submit"
+                      disabled={callbackSubmitting}
+                      style={{
+                        padding: '10px 14px',
+                        borderRadius: 999,
+                        border: 'none',
+                        background: 'var(--violet)',
+                        color: 'white',
+                        fontWeight: 600,
+                        fontSize: 13,
+                        fontFamily: 'inherit',
+                        cursor: callbackSubmitting ? 'not-allowed' : 'pointer',
+                        opacity: callbackSubmitting ? 0.7 : 1,
+                      }}
+                    >
+                      {callbackSubmitting ? 'Sending...' : 'Send callback request'}
+                    </button>
+                  </form>
+                </div>
+              )}
+
               {callbackNotice && (
                 <div
                   style={{
@@ -572,16 +659,20 @@ export function ChatWidget() {
                 onSubmit={handleSubmit}
                 style={{ display: 'flex', gap: 8, alignItems: 'center' }}
               >
-                <input
-                  type="text"
+                <textarea
+                  ref={textareaRef}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleComposerKeyDown}
                   placeholder="Type a message..."
                   disabled={isLoading}
+                  rows={1}
                   style={{
                     flex: 1,
                     padding: '10px 14px',
-                    borderRadius: 20,
+                    minHeight: 44,
+                    maxHeight: 132,
+                    borderRadius: 18,
                     border: '1px solid var(--input-border)',
                     background: 'var(--input-bg)',
                     color: 'var(--ink)',
@@ -590,6 +681,8 @@ export function ChatWidget() {
                     letterSpacing: '0.01em',
                     fontFamily: 'inherit',
                     outline: 'none',
+                    resize: 'none',
+                    overflowY: 'auto',
                   }}
                 />
                 <button
