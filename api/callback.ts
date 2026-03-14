@@ -16,6 +16,15 @@ type CallbackPayload = {
 }
 
 const RESEND_API_URL = 'https://api.resend.com/emails'
+const DEFAULT_CALLBACK_EMAIL_FROM = 'intake@callback.isokedevelops.com'
+
+function normalizeEnvValue(value: string | undefined) {
+  return value?.replace(/\r?\n/g, '').trim() ?? ''
+}
+
+function normalizeEmailAddress(value: string | undefined) {
+  return normalizeEnvValue(value).replace(/\s+/g, '')
+}
 
 function escapeHtml(value: string) {
   return value
@@ -70,10 +79,10 @@ function formatCallbackEmailText(payload: CallbackPayload) {
 }
 
 async function sendCallbackEmail(payload: CallbackPayload) {
-  const apiKey = process.env.RESEND_API_KEY
-  const to = process.env.CALLBACK_EMAIL_TO
-  const from = process.env.CALLBACK_EMAIL_FROM
-  const replyTo = process.env.CALLBACK_EMAIL_REPLY_TO
+  const apiKey = normalizeEnvValue(process.env.RESEND_API_KEY)
+  const to = normalizeEmailAddress(process.env.CALLBACK_EMAIL_TO)
+  const from = normalizeEmailAddress(process.env.CALLBACK_EMAIL_FROM) || DEFAULT_CALLBACK_EMAIL_FROM
+  const replyTo = normalizeEmailAddress(process.env.CALLBACK_EMAIL_REPLY_TO)
 
   if (!apiKey || !to || !from) {
     return { ok: false as const, reason: 'email_not_configured' }
