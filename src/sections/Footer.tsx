@@ -11,6 +11,7 @@ const quickLinks = [
   { label: 'Services',     href: '/#services' },
   { label: 'Careers',      href: '/#careers' },
   { label: 'Contact',      href: '/#contact' },
+  { label: 'Chat',         href: '#', openChat: true },
 ];
 
 const socials = [
@@ -130,9 +131,18 @@ export function Footer() {
           <div>
             <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' as const, color: '#B89FD8', marginBottom: 20 }}>Quick Links</p>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column' as const, gap: 10 }}>
-              {quickLinks.map(({ label, href }) => (
+              {quickLinks.map(({ label, href, openChat }) => (
                 <li key={label}>
-                  <a href={href} onClick={(e) => scrollTo(e, href)}
+                  <a
+                    href={href}
+                    onClick={(e) => {
+                      if (openChat) {
+                        e.preventDefault()
+                        window.dispatchEvent(new CustomEvent('isoke-open-chat'))
+                        return
+                      }
+                      scrollTo(e, href)
+                    }}
                     style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', textDecoration: 'none', transition: 'color 0.18s' }}
                     onMouseEnter={e => (e.currentTarget as HTMLAnchorElement).style.color = '#E8956D'}
                     onMouseLeave={e => (e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.7)'}

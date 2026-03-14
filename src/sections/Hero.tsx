@@ -274,20 +274,41 @@ export function Hero() {
               ))}
             </div>
 
-            {/* Slide indicators */}
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {/* Slide indicators — 44px touch target for accessibility */}
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
               {SLIDES.map((_, i) => (
                 <button
                   key={i}
+                  type="button"
                   aria-label={`Go to slide ${i + 1}`}
                   onClick={() => { setActive(i); setPaused(true); setTimeout(() => setPaused(false), 8000); }}
                   style={{
-                    border: 'none', cursor: 'pointer', borderRadius: 999, padding: 0,
-                    width: i === active ? 28 : 8, height: 8,
-                    background: i === active ? '#B89FD8' : 'rgba(255,255,255,0.2)',
-                    transition: 'all 0.3s ease',
+                    border: 'none',
+                    cursor: 'pointer',
+                    borderRadius: 999,
+                    padding: 0,
+                    minWidth: 44,
+                    minHeight: 44,
+                    width: 44,
+                    height: 44,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'transparent',
+                    transition: 'background 0.2s ease',
                   }}
-                />
+                >
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      width: i === active ? 28 : 8,
+                      height: 8,
+                      borderRadius: 999,
+                      background: i === active ? '#B89FD8' : 'rgba(255,255,255,0.2)',
+                      transition: 'all 0.3s ease',
+                    }}
+                  />
+                </button>
               ))}
             </div>
           </motion.div>
@@ -305,8 +326,9 @@ export function Hero() {
         }}
       />
 
-      {/* Scroll indicator */}
+      {/* Scroll indicator — 44px min touch target */}
       <motion.button
+        type="button"
         aria-label="Scroll down"
         onClick={() => document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' })}
         animate={{ y: [0, 8, 0] }}
@@ -315,7 +337,9 @@ export function Hero() {
           position: 'absolute', bottom: 36, left: '50%', transform: 'translateX(-50%)',
           zIndex: 10, background: 'none', border: 'none', cursor: 'pointer',
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-          padding: 8,
+          padding: 10,
+          minWidth: 44,
+          minHeight: 44,
         }}
       >
         <span style={{

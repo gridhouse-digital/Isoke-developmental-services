@@ -90,6 +90,7 @@ const links = [
   { label: 'Services', href: '/#services' },
   { label: 'Careers',  href: '/#careers' },
   { label: 'Contact',  href: '/#contact' },
+  { label: 'Chat',     href: '#', openChat: true },
 ];
 
 export function Navbar({ isDark, onToggleTheme }: NavbarProps) {
@@ -123,7 +124,7 @@ export function Navbar({ isDark, onToggleTheme }: NavbarProps) {
 
   // Track which section is in view
   useEffect(() => {
-    const ids = links.map(l => l.href.replace('/#', ''));
+    const ids = links.map(l => l.href.replace('/#', '')).filter(Boolean);
     const observers: IntersectionObserver[] = [];
     const visible = new Map<string, number>();
 
@@ -191,13 +192,20 @@ export function Navbar({ isDark, onToggleTheme }: NavbarProps) {
           {/* Desktop links */}
           <div className="hidden md:flex" style={{ alignItems: 'center', gap: 4 }}>
             {links.map((link) => {
-              const id = link.href.replace('/#', '');
+              const id = 'openChat' in link && link.openChat ? '' : link.href.replace('/#', '');
               const isActive = activeId === id;
               return (
                 <a
                   key={link.label}
                   href={link.href}
-                  onClick={(e) => handleAnchor(e, link.href)}
+                  onClick={(e) => {
+                    if ('openChat' in link && link.openChat) {
+                      e.preventDefault()
+                      window.dispatchEvent(new CustomEvent('isoke-open-chat'))
+                      return
+                    }
+                    handleAnchor(e, link.href)
+                  }}
                   style={{
                     position: 'relative',
                     padding: '8px 18px',
@@ -410,8 +418,17 @@ export function Navbar({ isDark, onToggleTheme }: NavbarProps) {
             <nav style={{ padding: '20px 32px 28px', display: 'flex', flexDirection: 'column', gap: 4 }}>
               {links.map((link) => (
                 <a
-                  key={link.label} href={link.href}
-                  onClick={(e) => handleAnchor(e, link.href)}
+                  key={link.label}
+                  href={link.href}
+                  onClick={(e) => {
+                    if ('openChat' in link && link.openChat) {
+                      e.preventDefault()
+                      setMobileOpen(false)
+                      window.dispatchEvent(new CustomEvent('isoke-open-chat'))
+                      return
+                    }
+                    handleAnchor(e, link.href)
+                  }}
                   style={{
                     padding: '13px 16px', borderRadius: 12,
                     fontSize: 16, fontWeight: 500,

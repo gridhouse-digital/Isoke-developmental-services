@@ -5,13 +5,20 @@
   "type": "module",
   "scripts": {
     "dev": "node node_modules/vite/bin/vite.js",
+    "dev:api": "node scripts/dev-api.mjs",
+    "dev:full": "node scripts/dev-full.mjs",
     "build": "node node_modules/vite/bin/vite.js build",
     "preview": "node node_modules/vite/bin/vite.js preview",
     "typecheck": "node node_modules/typescript/bin/tsc --noEmit",
     "lint": "eslint ."
   },
   "dependencies": {
+    "@ai-sdk/gateway": "^3.0.66",
+    "@ai-sdk/openai": "^1.0.0",
+    "@ai-sdk/openai-compatible": "^2.0.35",
+    "@ai-sdk/react": "^2.0.156",
     "@tailwindcss/vite": "^4.2.1",
+    "ai": "^5.0.154",
     "framer-motion": "^12.34.4",
     "lucide-react": "^0.576.0",
     "react": "^19.2.0",
@@ -31,6 +38,7 @@
     "globals": "^16.5.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.48.0",
+    "vercel": "^39.0.0",
     "vite": "^7.3.1"
   }
 }
