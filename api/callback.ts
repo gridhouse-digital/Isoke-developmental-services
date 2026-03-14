@@ -1,3 +1,5 @@
+import { Resend } from 'resend'
+
 /**
  * POST /api/callback
  * Body: { name: string, phone: string, bestTime?: string, service?: string }
@@ -15,7 +17,6 @@ type CallbackPayload = {
   service: string
 }
 
-const RESEND_API_URL = 'https://api.resend.com/emails'
 const DEFAULT_CALLBACK_EMAIL_FROM = 'intake@callback.isokedevelops.com'
 
 function normalizeEnvValue(value: string | undefined) {
@@ -88,30 +89,18 @@ async function sendCallbackEmail(payload: CallbackPayload) {
     return { ok: false as const, reason: 'email_not_configured' }
   }
 
-  const idempotencyKey = `callback-${payload.phone.replace(/\D/g, '')}-${payload.bestTime
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')}`
-
-  const res = await fetch(RESEND_API_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'Idempotency-Key': idempotencyKey,
-    },
-    body: JSON.stringify({
-      from,
-      to: [to],
-      subject: `New callback request from ${payload.name}`,
-      html: formatCallbackEmailHtml(payload),
-      text: formatCallbackEmailText(payload),
-      ...(replyTo ? { reply_to: replyTo } : {}),
-    }),
+  const resend = new Resend(apiKey)
+  const response = await resend.emails.send({
+    from,
+    to: [to],
+    subject: `New callback request from ${payload.name}`,
+    html: formatCallbackEmailHtml(payload),
+    text: formatCallbackEmailText(payload),
+    ...(replyTo ? { replyTo } : {}),
   })
 
-  if (!res.ok) {
-    const errorBody = await res.text()
-    throw new Error(`Resend email failed: ${res.status} ${errorBody}`)
+  if (response.error) {
+    throw new Error(`Resend email failed: ${response.error.message}`)
   }
 
   return { ok: true as const }
@@ -135,8 +124,6 @@ async function forwardCallbackWebhook(payload: CallbackPayload) {
 
   return { ok: true as const }
 }
-
-export const config = { runtime: 'edge' }
 
 export async function POST(req: Request) {
   try {
