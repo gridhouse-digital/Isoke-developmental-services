@@ -25,11 +25,11 @@ const WELCOME_ACTIONS = [
 const OPEN_CHAT_EVENT = 'isoke-open-chat'
 const ASSISTANT_REVEAL_MS = 20
 const ASSISTANT_REVEAL_CHARS = 2
-const CALLBACK_CONFIRMATION_RE = /we(?:'ll| will) have someone call you at/i
 const CALLBACK_API_URL =
   typeof window !== 'undefined' && window.location.hostname === 'localhost'
     ? 'http://localhost:3001/api/callback'
     : '/api/callback'
+const CALLBACK_CONTEXT_RE = /\b(callback|call\s*back|call me|call you|call us|phone call)\b/i
 const CALLBACK_SERVICE_OPTIONS = [
   'Community Participation Support',
   'Companion Services',
@@ -64,6 +64,14 @@ function extractName(text: string) {
   for (const pattern of patterns) {
     const match = text.match(pattern)
     if (match?.[1]) return cleanCapturedValue(match[1])
+  }
+
+  const bareName = text.trim()
+  if (
+    /^[a-z][a-z'.-]+(?:\s+[a-z][a-z'.-]+){1,3}$/i.test(bareName) &&
+    !/\b(callback|call|phone|service|time|morning|afternoon|evening|am|pm)\b/i.test(bareName)
+  ) {
+    return cleanCapturedValue(bareName)
   }
 
   return ''
@@ -130,19 +138,19 @@ function extractCallbackDetails(
   return details
 }
 
-function getConfirmedCallbackDetails(
+function hasCallbackContext(messages: Array<{ parts: Array<{ text?: string; type: string }>; role: string }>) {
+  return messages.some((message) => CALLBACK_CONTEXT_RE.test(messageText(message.parts)))
+}
+
+function getReadyCallbackDetails(
   messages: Array<{ parts: Array<{ text?: string; type: string }>; role: string }>,
 ) {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index]
-    if (message.role !== 'assistant') continue
+  if (!hasCallbackContext(messages)) return null
 
-    if (CALLBACK_CONFIRMATION_RE.test(messageText(message.parts))) {
-      return extractCallbackDetails(messages.slice(0, index + 1))
-    }
-  }
+  const details = extractCallbackDetails(messages)
+  if (!details.name || !details.phone || !details.bestTime) return null
 
-  return null
+  return details
 }
 
 function messageText(parts: Array<{ type: string; text?: string }>): string {
@@ -225,7 +233,7 @@ export function ChatWidget() {
   }, [])
 
   useEffect(() => {
-    const callbackDetails = getConfirmedCallbackDetails(messages)
+    const callbackDetails = getReadyCallbackDetails(messages)
     if (!callbackDetails?.name || !callbackDetails.phone || !callbackDetails.bestTime) return
 
     const submissionKey = JSON.stringify(callbackDetails)
