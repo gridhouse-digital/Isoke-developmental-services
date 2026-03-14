@@ -145,7 +145,7 @@ async function sendCallbackEmail(payload) {
       subject: `New callback request from ${payload.name}`,
       html: formatCallbackEmailHtml(payload),
       text: formatCallbackEmailText(payload),
-      ...(replyTo ? { replyTo } : {}),
+      ...(replyTo ? { reply_to: replyTo } : {}),
     }),
   })
 
@@ -301,7 +301,7 @@ const server = createServer(async (req, res) => {
   } catch (e) {
     console.error(e)
     res.writeHead(500, { 'Content-Type': 'application/json', ...corsHeaders })
-    res.end(JSON.stringify({ error: 'Request failed' }))
+    res.end(JSON.stringify({ error: e instanceof Error ? e.message : 'Request failed' }))
   }
 })
 

@@ -105,7 +105,7 @@ async function sendCallbackEmail(payload: CallbackPayload) {
       subject: `New callback request from ${payload.name}`,
       html: formatCallbackEmailHtml(payload),
       text: formatCallbackEmailText(payload),
-      ...(replyTo ? { replyTo } : {}),
+      ...(replyTo ? { reply_to: replyTo } : {}),
     }),
   })
 
@@ -194,7 +194,8 @@ export async function POST(req: Request) {
     )
   } catch (e) {
     console.error(e)
-    return new Response(JSON.stringify({ error: 'Callback failed' }), {
+    const message = e instanceof Error ? e.message : 'Callback failed'
+    return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     })
