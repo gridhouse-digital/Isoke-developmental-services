@@ -10,6 +10,7 @@ import { AboutPage } from './pages/AboutPage';
 import { ServicesPage } from './pages/ServicesPage';
 import { CareersPage } from './pages/CareersPage';
 import { ContactPage } from './pages/ContactPage';
+import { AdmissionsPage } from './pages/AdmissionsPage';
 import { ChatWidget } from './components/ChatWidget';
 import { initTheme, toggleTheme } from './lib/utils';
 
@@ -89,6 +90,7 @@ function AppLayout() {
           <Route path="/services" element={<ServicesPage />} />
           <Route path="/careers" element={<CareersPage />} />
           <Route path="/contact" element={<ContactPage />} />
+          <Route path="/admissions" element={<AdmissionsPage />} />
           <Route path="*" element={<Home />} />
         </Routes>
       </div>

@@ -88,6 +88,7 @@ function navColors(isDark: boolean, scrolled: boolean) {
 const links = [
   { label: 'About',    href: '/#about' },
   { label: 'Services', href: '/#services' },
+  { label: 'Admissions', href: '/admissions' },
   { label: 'Careers',  href: '/#careers' },
   { label: 'Contact',  href: '/#contact' },
   { label: 'Chat',     href: '#', openChat: true },
@@ -124,7 +125,15 @@ export function Navbar({ isDark, onToggleTheme }: NavbarProps) {
 
   // Track which section is in view
   useEffect(() => {
-    const ids = links.map(l => l.href.replace('/#', '')).filter(Boolean);
+    if (location.pathname !== '/') {
+      setActiveId('');
+      return;
+    }
+
+    const ids = links
+      .filter(l => l.href.startsWith('/#'))
+      .map(l => l.href.replace('/#', ''))
+      .filter(Boolean);
     const observers: IntersectionObserver[] = [];
     const visible = new Map<string, number>();
 
@@ -149,7 +158,7 @@ export function Navbar({ isDark, onToggleTheme }: NavbarProps) {
     });
 
     return () => observers.forEach(o => o.disconnect());
-  }, []);
+  }, [location.pathname]);
 
   const handleAnchor = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
     if (href.startsWith('/#') && location.pathname === '/') {
@@ -192,8 +201,9 @@ export function Navbar({ isDark, onToggleTheme }: NavbarProps) {
           {/* Desktop links */}
           <div className="hidden md:flex" style={{ alignItems: 'center', gap: 4 }}>
             {links.map((link) => {
-              const id = 'openChat' in link && link.openChat ? '' : link.href.replace('/#', '');
-              const isActive = activeId === id;
+              const isRouteLink = link.href.startsWith('/') && !link.href.startsWith('/#');
+              const id = link.href.startsWith('/#') ? link.href.replace('/#', '') : '';
+              const isActive = isRouteLink ? location.pathname === link.href : activeId === id;
               return (
                 <a
                   key={link.label}
@@ -202,6 +212,10 @@ export function Navbar({ isDark, onToggleTheme }: NavbarProps) {
                     if ('openChat' in link && link.openChat) {
                       e.preventDefault()
                       window.dispatchEvent(new CustomEvent('isoke-open-chat'))
+                      return
+                    }
+                    if (isRouteLink) {
+                      setMobileOpen(false)
                       return
                     }
                     handleAnchor(e, link.href)
@@ -425,6 +439,10 @@ export function Navbar({ isDark, onToggleTheme }: NavbarProps) {
                       e.preventDefault()
                       setMobileOpen(false)
                       window.dispatchEvent(new CustomEvent('isoke-open-chat'))
+                      return
+                    }
+                    if (link.href.startsWith('/') && !link.href.startsWith('/#')) {
+                      setMobileOpen(false)
                       return
                     }
                     handleAnchor(e, link.href)

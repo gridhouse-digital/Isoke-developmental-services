@@ -2,6 +2,11 @@ import { useState } from 'react';
 import { MapPin, Phone, Mail, Clock, Send, CheckCircle } from 'lucide-react';
 import { FadeIn } from '../components/FadeIn';
 
+const CONTACT_API_URL =
+  typeof window !== 'undefined' && window.location.hostname === 'localhost'
+    ? 'http://localhost:3001/api/contact'
+    : '/api/contact';
+
 const contactDetails = [
   {
     icon: MapPin,
@@ -28,7 +33,7 @@ function validate(f: FormState): FormErrors {
   const e: FormErrors = {};
   if (!f.name.trim())  e.name    = 'Name is required';
   if (!f.email.trim()) e.email   = 'Email is required';
-  else if (!/^[^s@]+@[^s@]+.[^s@]+$/.test(f.email)) e.email = 'Enter a valid email';
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email)) e.email = 'Enter a valid email';
   if (!f.message.trim()) e.message = 'Message is required';
   return e;
 }
@@ -49,6 +54,8 @@ export function Contact() {
   const [form, setForm] = useState<FormState>({ name: '', email: '', phone: '', subject: '', message: '' });
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const onChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -56,11 +63,39 @@ export function Contact() {
     if (errors[name as keyof FormState]) setErrors((p) => ({ ...p, [name]: undefined }));
   };
 
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errs = validate(form);
     if (Object.keys(errs).length) { setErrors(errs); return; }
-    setSubmitted(true);
+
+    setSubmitError('');
+    setSubmitting(true);
+
+    try {
+      const response = await fetch(CONTACT_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: form.email.trim(),
+          message: form.message.trim(),
+          name: form.name.trim(),
+          phone: form.phone.trim(),
+          subject: form.subject.trim(),
+        }),
+      });
+
+      const data = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) {
+        throw new Error(data.error || 'Contact form request failed');
+      }
+
+      setSubmitted(true);
+      setForm({ name: '', email: '', phone: '', subject: '', message: '' });
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'We could not send your message right now.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -190,12 +225,12 @@ export function Contact() {
                         className="form-input"
                         style={{ ...inputBase, background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(123,94,167,0.14)' }}>
                         <option value="">Select Service</option>
-                        <option value="community">Community Participation Support</option>
-                        <option value="companion">Companion Services</option>
-                        <option value="nursing">Shift Nursing</option>
-                        <option value="homecare">In-Home Community Support</option>
-                        <option value="respite">Respite Services</option>
-                        <option value="transportation">Transportation Services</option>
+                        <option value="Community Participation Support">Community Participation Support</option>
+                        <option value="Companion Services">Companion Services</option>
+                        <option value="Shift Nursing">Shift Nursing</option>
+                        <option value="In-Home Community Support">In-Home Community Support</option>
+                        <option value="Respite Services">Respite Services</option>
+                        <option value="Transportation Services">Transportation Services</option>
                       </select>
                     </div>
                   </div>
@@ -209,13 +244,31 @@ export function Contact() {
                     {errors.message && <p style={{ fontSize: 11, color: '#e85d5d', marginTop: 3 }}>{errors.message}</p>}
                   </div>
 
+                  {submitError && (
+                    <div
+                      style={{
+                        marginBottom: 16,
+                        padding: '11px 13px',
+                        borderRadius: 12,
+                        border: '1px solid rgba(232, 93, 93, 0.22)',
+                        background: 'rgba(232, 93, 93, 0.08)',
+                        color: '#b42318',
+                        fontSize: 12.5,
+                        lineHeight: 1.55,
+                      }}
+                    >
+                      {submitError}
+                    </div>
+                  )}
+
                   <button
                     type="submit"
+                    disabled={submitting}
                     style={{
                       width: '100%',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
                       padding: '15px 28px',
-                      borderRadius: 14, border: 'none', cursor: 'pointer',
+                      borderRadius: 14, border: 'none', cursor: submitting ? 'not-allowed' : 'pointer',
                       fontSize: 15, fontWeight: 600,
                       fontFamily: "'Plus Jakarta Sans', sans-serif",
                       letterSpacing: '0.01em',
@@ -223,8 +276,10 @@ export function Contact() {
                       background: 'linear-gradient(135deg, #7B5EA7 0%, #7355D4 60%, #8B6EE8 100%)',
                       boxShadow: '0 8px 32px rgba(123,94,167,0.45)',
                       transition: 'box-shadow 0.25s ease, transform 0.2s ease',
+                      opacity: submitting ? 0.72 : 1,
                     }}
                     onMouseEnter={e => {
+                      if (submitting) return;
                       (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 12px 40px rgba(123,94,167,0.65)';
                       (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)';
                     }}
@@ -234,7 +289,7 @@ export function Contact() {
                     }}
                   >
                     <Send size={15} />
-                    Send Message
+                    {submitting ? 'Sending...' : 'Send Message'}
                   </button>
                 </form>
               )}

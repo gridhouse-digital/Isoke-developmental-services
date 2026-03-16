@@ -95,8 +95,10 @@ Use this file as the fastest source of truth for behavioral decisions. The handb
 
 ## 11. Email Delivery Rules
 - Callback delivery goes through `POST /api/callback`.
+- Public contact-form delivery goes through `POST /api/contact`.
 - Resend is the default email provider.
 - The callback sender must use the verified `callback.isokedevelops.com` domain.
+- The contact form should use the same verified sender domain pattern.
 - The callback route may also forward to an optional webhook.
 - The chatbot must never claim a callback was sent unless the callback submission succeeded.
 
