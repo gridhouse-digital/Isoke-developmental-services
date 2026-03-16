@@ -3,38 +3,37 @@ import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { convertToModelMessages, gateway, streamText } from 'ai'
 import { Resend } from 'resend'
+import { CHATBOT_MODEL, buildIsokeSystemPrompt } from '../chatbot/isoke-content.js'
+import {
+  DEFAULT_CALLBACK_EMAIL_FROM,
+  buildCallbackEmailContent,
+  buildCallbackEmailTags,
+  normalizeEmailAddress,
+  normalizeEnvValue,
+} from '../chatbot/callback-email-template.js'
 
-const ISOKE_SYSTEM_PROMPT = `You are the friendly, professional voice of Isoke Developmental Services. Isoke provides person-centered support for adults with intellectual and developmental disabilities (IDD) across Pennsylvania.
+const ISOKE_SYSTEM_PROMPT = buildIsokeSystemPrompt()
 
-**About Isoke**
-- Mission: Empower every ability through compassionate, individualized care.
-- We serve adults with IDD and their families.
+function buildRequestSystemPrompt(visitorProfile = {}) {
+  const firstName = visitorProfile.firstName?.trim?.() || ''
+  const cityState = visitorProfile.cityState?.trim?.() || ''
 
-**Services we offer**
-- Community Participation Support - connecting people to community activities and social opportunities
-- Companion Services - in-home daily living support, medication reminders, social engagement
-- Shift Nursing - licensed in-home nursing (medication management, vital signs, wound care)
-- In-Home Community Support - skills for independent living (self-care, safety, finances, household management)
-- Respite Services - short-term care so caregivers can take a break
-- Transportation Services - reliable, trauma-informed transport for appointments, work, and community
+  if (!firstName && !cityState) {
+    return ISOKE_SYSTEM_PROMPT
+  }
 
-**Contact**
-- Address: 2061-63 N 62nd St, Suite A, Philadelphia, PA 19151
-- Main phone: 1-(844) ISOKE-13 or 1-(844) 476-5313
-- After-hours number: (267) 983-8856
-- Email: intake@isokedevelops.com
-- Hours: Mon-Fri 9am-5pm Eastern
+  return `${ISOKE_SYSTEM_PROMPT}
 
-**Off-hours**
-If the user is likely contacting outside Mon-Fri 9am-5pm Eastern, briefly acknowledge we are currently outside business hours and that we will respond next business day. Explicitly mention the after-hours number ((267) 983-8856) and encourage them to leave a detailed message. After answering their question, ask if they would like a callback. Never say that Isoke does not have an after-hours number.
+Known visitor context
+- First name: ${firstName || 'Not provided'}
+- City and state: ${cityState || 'Not provided'}
 
-**Request a callback**
-If the user wants a callback, or mentions that they tried calling and did not get a response, proactively offer to arrange a callback. Ask for: (1) name, (2) phone number, (3) best time to call, and optionally (4) service of interest. Do not confirm the callback request until you have at least name, phone number, and best time to call. If any of those are missing, ask only for the missing item. Once you have name, phone number, and best time, confirm: "We'll have someone call you at [phone] around [best time]. Is there a service you'd like us to focus on?" Do not make up a confirmation number. If they share callback details in one message, collect what is missing and confirm.
-
-**Tone**
-Warm, clear, professional. If you do not know something, direct them to call 1-(844) 476-5313, use the after-hours number (267) 983-8856 when relevant, or email intake@isokedevelops.com. Keep answers concise but helpful.`
-
-const DEFAULT_CALLBACK_EMAIL_FROM = 'intake@callback.isokedevelops.com'
+Personalization rule
+- If a first name is available, use it naturally in the next assistant reply to make the conversation feel warm and personal.
+- When the user greets you or resumes the conversation, start the reply with a natural greeting that includes the first name.
+- Do not overuse the name in every sentence.
+- If city and state are available, use them only when they help route or personalize the guidance.`
+}
 
 function loadEnv() {
   const envPath = resolve(process.cwd(), '.env')
@@ -58,66 +57,6 @@ function loadEnv() {
   })
 }
 
-function escapeHtml(value) {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;')
-}
-
-function normalizeEnvValue(value) {
-  return value?.replace(/\r?\n/g, '').trim() ?? ''
-}
-
-function normalizeEmailAddress(value) {
-  return normalizeEnvValue(value).replace(/\s+/g, '')
-}
-
-function formatCallbackEmailHtml(payload) {
-  return `
-    <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.6;">
-      <h2 style="margin: 0 0 16px;">New callback request from website chat</h2>
-      <p style="margin: 0 0 16px;">A visitor requested a callback through the Isoke chatbot.</p>
-      <table style="border-collapse: collapse; width: 100%; max-width: 560px;">
-        <tr>
-          <td style="padding: 8px 12px; border: 1px solid #e5e7eb; font-weight: 600;">Name</td>
-          <td style="padding: 8px 12px; border: 1px solid #e5e7eb;">${escapeHtml(payload.name)}</td>
-        </tr>
-        <tr>
-          <td style="padding: 8px 12px; border: 1px solid #e5e7eb; font-weight: 600;">Phone</td>
-          <td style="padding: 8px 12px; border: 1px solid #e5e7eb;">${escapeHtml(payload.phone)}</td>
-        </tr>
-        <tr>
-          <td style="padding: 8px 12px; border: 1px solid #e5e7eb; font-weight: 600;">Best time</td>
-          <td style="padding: 8px 12px; border: 1px solid #e5e7eb;">${escapeHtml(payload.bestTime || 'Not provided')}</td>
-        </tr>
-        <tr>
-          <td style="padding: 8px 12px; border: 1px solid #e5e7eb; font-weight: 600;">Service</td>
-          <td style="padding: 8px 12px; border: 1px solid #e5e7eb;">${escapeHtml(payload.service || 'Not provided')}</td>
-        </tr>
-        <tr>
-          <td style="padding: 8px 12px; border: 1px solid #e5e7eb; font-weight: 600;">Submitted at</td>
-          <td style="padding: 8px 12px; border: 1px solid #e5e7eb;">${escapeHtml(payload.at)}</td>
-        </tr>
-      </table>
-    </div>
-  `.trim()
-}
-
-function formatCallbackEmailText(payload) {
-  return [
-    'New callback request from website chat',
-    '',
-    `Name: ${payload.name}`,
-    `Phone: ${payload.phone}`,
-    `Best time: ${payload.bestTime || 'Not provided'}`,
-    `Service: ${payload.service || 'Not provided'}`,
-    `Submitted at: ${payload.at}`,
-  ].join('\n')
-}
-
 async function sendCallbackEmail(payload) {
   const apiKey = normalizeEnvValue(process.env.RESEND_API_KEY)
   const to = normalizeEmailAddress(process.env.CALLBACK_EMAIL_TO)
@@ -129,12 +68,14 @@ async function sendCallbackEmail(payload) {
   }
 
   const resend = new Resend(apiKey)
+  const email = buildCallbackEmailContent(payload)
   const response = await resend.emails.send({
     from,
     to: [to],
-    subject: `New callback request from ${payload.name}`,
-    html: formatCallbackEmailHtml(payload),
-    text: formatCallbackEmailText(payload),
+    subject: email.subject,
+    html: email.html,
+    text: email.text,
+    tags: buildCallbackEmailTags(payload),
     ...(replyTo ? { replyTo } : {}),
   })
 
@@ -165,11 +106,11 @@ async function forwardCallbackWebhook(payload) {
 }
 
 async function handleChat(body) {
-  const { messages } = JSON.parse(body)
+  const { messages = [], visitorProfile } = JSON.parse(body)
   const result = streamText({
-    model: gateway('openai/gpt-4o-mini'),
-    system: ISOKE_SYSTEM_PROMPT,
-    messages: convertToModelMessages(messages),
+    model: gateway(CHATBOT_MODEL),
+    system: buildRequestSystemPrompt(visitorProfile),
+    messages: convertToModelMessages(Array.isArray(messages) ? messages : []),
   })
 
   return result.toUIMessageStreamResponse()
@@ -180,6 +121,7 @@ async function handleCallback(body) {
   const name = parsed.name?.trim?.() ?? ''
   const phone = parsed.phone?.trim?.() ?? ''
   const bestTime = parsed.bestTime?.trim?.() ?? ''
+  const location = parsed.location?.trim?.() ?? ''
   const service = parsed.service?.trim?.() ?? ''
 
   if (!name || !phone || !bestTime) {
@@ -192,6 +134,7 @@ async function handleCallback(body) {
   const payload = {
     at: new Date().toISOString(),
     bestTime,
+    location,
     name,
     phone,
     service,
