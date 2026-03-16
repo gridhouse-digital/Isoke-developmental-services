@@ -19,6 +19,7 @@
     "@ai-sdk/react": "^2.0.156",
     "@tailwindcss/vite": "^4.2.1",
     "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.0.0",
     "ai": "^5.0.154",
     "framer-motion": "^12.34.4",
     "lucide-react": "^0.576.0",
