@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { ChevronUp } from 'lucide-react';
 import { Navbar } from './sections/Navbar';
 import { Footer } from './sections/Footer';
@@ -95,6 +96,7 @@ function AppLayout() {
       <BackToTopButton />
       <ChatWidget />
       <Analytics />
+      <SpeedInsights />
     </div>
   );
 }
