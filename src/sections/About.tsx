@@ -1,6 +1,6 @@
 import { FadeIn } from '../components/FadeIn';
 
-const ABOUT_IMAGE = '/images/Licensed.jpg';
+const ABOUT_IMAGE = '/images/black-girl-yellow-shirt.jpg';
 
 export function About() {
   return (
