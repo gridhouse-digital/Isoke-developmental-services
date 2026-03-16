@@ -7,15 +7,15 @@ import { ThemeToggle } from '../components/ThemeToggle';
 const staffPortals = [
   {
     icon: BookOpen,
-    label: 'CareLearn Portal',
-    sublabel: 'Training & compliance',
-    href: '#',
+    label: 'Workforce Compliance',
+    sublabel: 'Training & governance',
+    href: 'https://compliance.isokedevelops.com/',
   },
   {
     icon: Users2,
     label: 'PeopleHub',
     sublabel: 'HR & staff management',
-    href: '#',
+    href: 'https://isokedevelops.bamboohr.com/',
   },
 ];
 

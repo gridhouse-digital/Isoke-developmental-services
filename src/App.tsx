@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { Analytics } from '@vercel/analytics/react';
 import { ChevronUp } from 'lucide-react';
 import { Navbar } from './sections/Navbar';
 import { Footer } from './sections/Footer';
@@ -93,6 +94,7 @@ function AppLayout() {
       <Footer />
       <BackToTopButton />
       <ChatWidget />
+      <Analytics />
     </div>
   );
 }

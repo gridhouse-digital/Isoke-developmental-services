@@ -105,6 +105,31 @@ async function fetchBambooJobs(signal: AbortSignal): Promise<Job[]> {
 }
 
 function JobCard({ job }: { job: Job }) {
+  const isDarkMode = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+  const theme = isDarkMode
+    ? {
+        accent: '#D9C8F4',
+        badgeBg: 'rgba(184,159,216,0.16)',
+        badgeText: '#E8DFFF',
+        cardBg: 'rgba(24,20,34,0.92)',
+        cardBorder: 'rgba(184,159,216,0.18)',
+        iconBg: 'rgba(184,159,216,0.12)',
+        metaText: 'rgba(220,210,235,0.82)',
+        shadow: '0 10px 28px rgba(0,0,0,0.32)',
+        text: 'var(--ink)',
+      }
+    : {
+        accent: '#7B5EA7',
+        badgeBg: 'rgba(123,94,167,0.08)',
+        badgeText: '#7B5EA7',
+        cardBg: 'rgba(255,255,255,0.74)',
+        cardBorder: 'rgba(123,94,167,0.12)',
+        iconBg: 'rgba(123,94,167,0.09)',
+        metaText: 'var(--muted)',
+        shadow: '0 6px 24px rgba(123,94,167,0.06)',
+        text: 'var(--ink)',
+      };
+
   return (
     <motion.a
       href={job.applyUrl}
@@ -119,10 +144,10 @@ function JobCard({ job }: { job: Job }) {
         gap: 24,
         padding: '22px 24px',
         borderRadius: 18,
-        background: 'rgba(255,255,255,0.74)',
+        background: theme.cardBg,
         backdropFilter: 'blur(10px)',
-        border: '1px solid rgba(123,94,167,0.12)',
-        boxShadow: '0 6px 24px rgba(123,94,167,0.06)',
+        border: `1px solid ${theme.cardBorder}`,
+        boxShadow: theme.shadow,
         textDecoration: 'none',
       }}
     >
@@ -133,7 +158,7 @@ function JobCard({ job }: { job: Job }) {
             fontSize: 15,
             fontWeight: 600,
             lineHeight: 1.45,
-            color: 'var(--ink)',
+            color: theme.text,
             marginBottom: 10,
           }}
         >
@@ -147,7 +172,7 @@ function JobCard({ job }: { job: Job }) {
               alignItems: 'center',
               gap: 6,
               fontSize: 12,
-              color: 'var(--muted)',
+              color: theme.metaText,
             }}
           >
             <MapPin size={12} />
@@ -159,7 +184,7 @@ function JobCard({ job }: { job: Job }) {
               alignItems: 'center',
               gap: 6,
               fontSize: 12,
-              color: 'var(--muted)',
+              color: theme.metaText,
             }}
           >
             <Clock size={12} />
@@ -183,8 +208,8 @@ function JobCard({ job }: { job: Job }) {
             fontWeight: 700,
             letterSpacing: '0.1em',
             textTransform: 'uppercase',
-            color: '#7B5EA7',
-            background: 'rgba(123,94,167,0.08)',
+            color: theme.badgeText,
+            background: theme.badgeBg,
             padding: '5px 12px',
             borderRadius: 999,
           }}
@@ -196,13 +221,13 @@ function JobCard({ job }: { job: Job }) {
             width: 38,
             height: 38,
             borderRadius: 12,
-            background: 'rgba(123,94,167,0.09)',
+            background: theme.iconBg,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <ArrowRight size={16} style={{ color: '#7B5EA7' }} />
+          <ArrowRight size={16} style={{ color: theme.accent }} />
         </div>
       </div>
     </motion.a>
@@ -210,6 +235,27 @@ function JobCard({ job }: { job: Job }) {
 }
 
 function BambooHRJobs() {
+  const isDarkMode = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+  const theme = isDarkMode
+    ? {
+        border: 'rgba(184,159,216,0.18)',
+        noticeBg: 'rgba(255,255,255,0.05)',
+        noticeBorder: 'rgba(184,159,216,0.14)',
+        noticeText: 'rgba(220,210,235,0.82)',
+        panelBg: 'rgba(20,17,28,0.92)',
+        shadow: '0 14px 40px rgba(0,0,0,0.28)',
+        titleText: 'var(--ink)',
+      }
+    : {
+        border: 'rgba(123,94,167,0.12)',
+        noticeBg: 'rgba(245,240,236,0.82)',
+        noticeBorder: 'rgba(123,94,167,0.08)',
+        noticeText: 'var(--muted)',
+        panelBg: 'linear-gradient(180deg, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.46) 100%)',
+        shadow: '0 14px 40px rgba(123,94,167,0.08)',
+        titleText: 'var(--ink)',
+      };
+
   const [state, setState] = useState<JobsState>(() => {
     if (!bambooHRConfig.enabled) {
       return {
@@ -272,9 +318,9 @@ function BambooHRJobs() {
       style={{
         borderRadius: 24,
         padding: 24,
-        background: 'linear-gradient(180deg, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.46) 100%)',
-        border: '1px solid rgba(123,94,167,0.12)',
-        boxShadow: '0 14px 40px rgba(123,94,167,0.08)',
+        background: theme.panelBg,
+        border: `1px solid ${theme.border}`,
+        boxShadow: theme.shadow,
       }}
     >
       <div
@@ -294,13 +340,13 @@ function BambooHRJobs() {
               fontSize: 22,
               fontWeight: 600,
               lineHeight: 1.2,
-              color: 'var(--ink)',
+              color: theme.titleText,
               marginBottom: 6,
             }}
           >
             Open Positions
           </p>
-          <p style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--muted)' }}>
+          <p style={{ fontSize: 13, lineHeight: 1.7, color: theme.noticeText }}>
             Every listing below links to the specific BambooHR posting, not the general board.
           </p>
         </div>
@@ -313,11 +359,11 @@ function BambooHRJobs() {
           marginBottom: 18,
           padding: '14px 16px',
           borderRadius: 16,
-          background: 'rgba(245,240,236,0.82)',
-          border: '1px solid rgba(123,94,167,0.08)',
+          background: theme.noticeBg,
+          border: `1px solid ${theme.noticeBorder}`,
           fontSize: 13,
           lineHeight: 1.7,
-          color: 'var(--muted)',
+          color: theme.noticeText,
         }}
       >
         {state.notice}
