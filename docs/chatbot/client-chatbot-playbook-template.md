@@ -137,6 +137,7 @@ Recommended email provider pattern:
 - reusable local email template module
 - optional webhook forwarding
 - tag outgoing emails for filtering and reporting
+- apply the same delivery pattern to any public website contact form so callback and contact messages use one consistent email stack
 
 ## 8. Resend Setup Checklist
 - verify the sending domain or subdomain
@@ -144,7 +145,11 @@ Recommended email provider pattern:
 - set `CALLBACK_EMAIL_TO`
 - set `CALLBACK_EMAIL_FROM`
 - optionally set `CALLBACK_EMAIL_REPLY_TO`
+- optionally set `CONTACT_EMAIL_TO`
+- optionally set `CONTACT_EMAIL_FROM`
+- optionally set `CONTACT_EMAIL_REPLY_TO`
 - send a direct test request to `/api/callback`
+- send a direct test request to `/api/contact` if a public contact form exists
 - confirm provider logs and recipient inbox
 
 Operational notes:
@@ -178,6 +183,7 @@ Do not block launch on analytics vendor selection.
 - prompt reviewed against approved facts
 - after-hours rules confirmed
 - callback flow tested directly and through chat
+- contact form tested directly and through the public UI if one exists
 - proactive teaser behavior reviewed across desktop and mobile
 - progressive profile collection reviewed for drop-off and clarity
 - email delivery verified

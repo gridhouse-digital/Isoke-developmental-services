@@ -1,7 +1,7 @@
 # Isoke Chatbot Handbook
 
 ## Overview
-The Isoke chatbot is a warm concierge chatbot with light intake. It answers approved service and contact questions, handles after-hours guidance, and converts support intent into callback requests sent through Resend. The bot runs inside the same Vite + Vercel project as the marketing site.
+The Isoke chatbot is a warm concierge chatbot with light intake. It answers approved service and contact questions, handles after-hours guidance, and converts support intent into callback requests sent through Resend. The public contact form also sends through Resend. The bot runs inside the same Vite + Vercel project as the marketing site.
 
 Primary reference documents:
 - `docs/chatbot/chatbot-rules-book.md` for operational behavior rules
@@ -12,9 +12,11 @@ Primary reference documents:
 - Frontend: `src/components/ChatWidget.tsx`
 - Chat route: `api/chat.ts`
 - Callback route: `api/callback.ts`
+- Contact route: `api/contact.ts`
 - Local API parity: `scripts/dev-api.mjs`
 - Shared chatbot content source: `chatbot/isoke-content.js`
 - Shared callback email template: `chatbot/callback-email-template.js`
+- Shared contact email template: `chatbot/contact-email-template.js`
 - Flow and analytics helpers: `src/lib/chatbot/flow.ts`, `src/lib/chatbot/analytics.ts`
 
 Runtime shape:
@@ -26,6 +28,7 @@ Runtime shape:
 6. After meaningful engagement, the widget progressively asks for first name and then city/state without requesting browser geolocation.
 7. If the user asks for a callback, the inline form posts to `POST /api/callback`.
 8. `api/callback.ts` sends a Resend email and optionally forwards the payload to a webhook.
+9. The public contact section form posts to `POST /api/contact` and sends a Resend email to the configured inbox.
 
 ## Content Model
 Business facts live in `chatbot/isoke-content.js`, not hardcoded directly inside the route logic.
@@ -123,6 +126,34 @@ Environment variables:
 - `CALLBACK_EMAIL_FROM`
 - `CALLBACK_EMAIL_REPLY_TO` optional
 - `CALLBACK_WEBHOOK_URL` optional
+- `CONTACT_EMAIL_TO` optional, falls back to `CALLBACK_EMAIL_TO`
+- `CONTACT_EMAIL_FROM` optional, falls back to `CALLBACK_EMAIL_FROM`
+- `CONTACT_EMAIL_REPLY_TO` optional, falls back to `CALLBACK_EMAIL_REPLY_TO`
+
+## Contact Form Delivery
+The public contact section uses a separate route from the chatbot callback flow.
+
+Request body:
+```json
+{
+  "name": "Visitor Name",
+  "email": "visitor@example.com",
+  "phone": "+15555550123",
+  "subject": "Companion Services",
+  "message": "I would like to learn more about support options."
+}
+```
+
+Delivery behavior:
+- sends through the official `resend` Node SDK
+- uses the same verified sender domain pattern as the callback route
+- defaults to the callback inbox/sender env vars when contact-specific env vars are not set
+- uses the visitor email as `replyTo` when no explicit reply-to env var is configured
+- attaches Resend tags:
+  - `type=contact_form_submission`
+  - `client=isoke`
+  - `source=website_contact_form`
+  - `subject=<normalized_subject>`
 
 ## Resend Operational Notes
 Important Resend findings for this stack:
@@ -173,8 +204,8 @@ npm run dev:full
 
 Why:
 - Vite serves the frontend on `http://localhost:5173`
-- `scripts/dev-api.mjs` serves `/api/chat` and `/api/callback` on `http://localhost:3001`
-- the widget automatically uses the local callback endpoint when running on localhost
+- `scripts/dev-api.mjs` serves `/api/chat`, `/api/callback`, and `/api/contact` on `http://localhost:3001`
+- the widget and contact form automatically use the local API endpoint when running on localhost
 
 ## Vercel Deployment
 Deployment assumptions:
@@ -187,6 +218,7 @@ Post-deploy checks:
 2. test after-hours behavior
 3. test callback submission from the inline form
 4. verify callback email in Resend and recipient inbox
+5. test the public contact form and verify contact email delivery
 
 ## QA Checklist
 - teaser appears on fresh page loads unless dismissed and does not auto-open the full panel
@@ -199,6 +231,7 @@ Post-deploy checks:
 - callback form opens from starter, direct callback ask, and guided callback chips
 - callback form pre-fills known name, city/state, and matched service when available
 - callback submission succeeds end to end
+- contact form submission succeeds end to end
 - fallback states provide direct contact or callback options
 - action chips remain relevant to the conversation
 - composer supports `Shift+Enter`
@@ -217,9 +250,19 @@ If callback email fails:
 - inspect `/api/callback` response body
 - inspect Resend event logs
 
+If contact form email fails:
+- check `RESEND_API_KEY`
+- check `CONTACT_EMAIL_TO` / `CONTACT_EMAIL_FROM` or their callback fallbacks
+- inspect `/api/contact` response body
+- inspect Resend event logs
+
 If local callback fails:
 - ensure `npm run dev:full` is running
 - ensure the browser is calling `http://localhost:3001/api/callback`
+
+If local contact form submission fails:
+- ensure `npm run dev:full` is running
+- ensure the browser is calling `http://localhost:3001/api/contact`
 
 ## Lessons Learned
 - prompt-only callback parsing is brittle; structured inline forms are more reliable

@@ -11,6 +11,11 @@ import {
   normalizeEmailAddress,
   normalizeEnvValue,
 } from '../chatbot/callback-email-template.js'
+import {
+  buildContactEmailContent,
+  buildContactEmailTags,
+  resolveContactEmailConfig,
+} from '../chatbot/contact-email-template.js'
 
 const ISOKE_SYSTEM_PROMPT = buildIsokeSystemPrompt()
 
@@ -105,6 +110,32 @@ async function forwardCallbackWebhook(payload) {
   return { ok: true }
 }
 
+async function sendContactEmail(payload) {
+  const { apiKey, from, replyTo, to } = resolveContactEmailConfig(process.env)
+
+  if (!apiKey || !to || !from) {
+    return { ok: false, reason: 'email_not_configured' }
+  }
+
+  const resend = new Resend(apiKey)
+  const email = buildContactEmailContent(payload)
+  const response = await resend.emails.send({
+    from,
+    to: [to],
+    subject: email.subject,
+    html: email.html,
+    text: email.text,
+    tags: buildContactEmailTags(payload),
+    replyTo: replyTo || payload.email,
+  })
+
+  if (response.error) {
+    throw new Error(`Resend contact email failed: ${response.error.message}`)
+  }
+
+  return { ok: true }
+}
+
 async function handleChat(body) {
   const { messages = [], visitorProfile } = JSON.parse(body)
   const result = streamText({
@@ -167,6 +198,45 @@ async function handleCallback(body) {
   )
 }
 
+async function handleContact(body) {
+  const parsed = JSON.parse(body)
+  const name = parsed.name?.trim?.() ?? ''
+  const email = parsed.email?.trim?.() ?? ''
+  const phone = parsed.phone?.trim?.() ?? ''
+  const subject = parsed.subject?.trim?.() ?? ''
+  const message = parsed.message?.trim?.() ?? ''
+
+  if (!name || !email || !message) {
+    return new Response(JSON.stringify({ error: 'name, email, and message are required' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  const payload = {
+    at: new Date().toISOString(),
+    email,
+    message,
+    name,
+    phone,
+    subject,
+  }
+
+  const emailResult = await sendContactEmail(payload)
+
+  if (!emailResult.ok) {
+    return new Response(JSON.stringify({ error: 'Contact form email delivery is not configured' }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  return new Response(JSON.stringify({ delivered: { email: true }, ok: true }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+
 const PORT = 3001
 loadEnv()
 
@@ -227,6 +297,14 @@ const server = createServer(async (req, res) => {
       return
     }
 
+    if (req.url === '/api/contact' || req.url === '/api/contact/') {
+      const response = await handleContact(body)
+      res.writeHead(response.status, { ...Object.fromEntries(response.headers.entries()), ...corsHeaders })
+      const responseText = await response.text()
+      res.end(responseText)
+      return
+    }
+
     res.writeHead(404, corsHeaders)
     res.end()
   } catch (e) {
@@ -239,4 +317,5 @@ const server = createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log(`[dev-api] Chat API on http://localhost:${PORT}/api/chat`)
   console.log(`[dev-api] Callback API on http://localhost:${PORT}/api/callback`)
+  console.log(`[dev-api] Contact API on http://localhost:${PORT}/api/contact`)
 })
