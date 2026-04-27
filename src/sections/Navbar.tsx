@@ -88,7 +88,6 @@ function navColors(isDark: boolean, scrolled: boolean) {
 const links = [
   { label: 'About',    href: '/#about' },
   { label: 'Services', href: '/#services' },
-  { label: 'Admissions', href: '/admissions' },
   { label: 'Careers',  href: '/#careers' },
   { label: 'Contact',  href: '/#contact' },
   { label: 'Chat',     href: '#', openChat: true },
