@@ -102,6 +102,14 @@ Use this file as the fastest source of truth for behavioral decisions. The handb
 - The callback route may also forward to an optional webhook.
 - The chatbot must never claim a callback was sent unless the callback submission succeeded.
 
+## 11A. API Guardrail Rules
+- Chat, callback, and contact API routes must enforce request body limits before processing payloads.
+- Chat, callback, and contact API routes must apply per-client rate limiting.
+- Callback submissions must validate name, phone number, and best time server-side.
+- Contact submissions must validate name, email address, message, and optional phone number server-side.
+- Visitor profile values sent into the chat prompt must be trimmed, length-limited, and normalized to single-line values.
+- Public API errors should be generic and action-oriented. Provider-specific failures belong in server logs, not visitor-facing responses.
+
 ## 12. Update Rules
 - If a behavior changes in the widget or chat route, update this rules book.
 - If a fact changes in the business content, update `chatbot/isoke-content.js` first.

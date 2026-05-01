@@ -22,6 +22,7 @@ export declare function buildContactEmailTags(payload: ContactPayload): Array<{
 
 export declare function resolveContactEmailConfig(env: Record<string, string | undefined>): {
   apiKey: string
+  bcc: string[]
   from: string
   replyTo: string
   to: string

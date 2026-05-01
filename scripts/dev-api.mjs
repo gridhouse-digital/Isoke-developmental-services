@@ -5,10 +5,20 @@ import { convertToModelMessages, gateway, streamText } from 'ai'
 import { Resend } from 'resend'
 import { CHATBOT_MODEL, buildIsokeSystemPrompt } from '../chatbot/isoke-content.js'
 import {
+  API_LIMITS,
+  buildJsonResponse,
+  buildRateLimitResponse,
+  checkRateLimit,
+  validateCallbackPayload,
+  validateChatPayload,
+  validateContactPayload,
+} from '../chatbot/api-guardrails.js'
+import {
   DEFAULT_CALLBACK_EMAIL_FROM,
   buildCallbackEmailContent,
   buildCallbackEmailTags,
   normalizeEmailAddress,
+  normalizeEmailList,
   normalizeEnvValue,
 } from '../chatbot/callback-email-template.js'
 import {
@@ -62,9 +72,29 @@ function loadEnv() {
   })
 }
 
+function getDevClientId(req) {
+  const forwardedFor = req.headers['x-forwarded-for']
+  const realIp = req.headers['x-real-ip']
+  const ip = (Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor) || realIp || req.socket.remoteAddress || 'unknown'
+  return String(ip).split(',')[0]?.trim() || 'unknown'
+}
+
+function parseJsonBody(body, maxBytes) {
+  if (Buffer.byteLength(body, 'utf8') > maxBytes) {
+    return { response: buildJsonResponse({ error: 'Request body is too large.' }, 413) }
+  }
+
+  try {
+    return { data: body ? JSON.parse(body) : {} }
+  } catch {
+    return { response: buildJsonResponse({ error: 'Request body must be valid JSON.' }, 400) }
+  }
+}
+
 async function sendCallbackEmail(payload) {
   const apiKey = normalizeEnvValue(process.env.RESEND_API_KEY)
   const to = normalizeEmailAddress(process.env.CALLBACK_EMAIL_TO)
+  const bcc = normalizeEmailList(process.env.CALLBACK_EMAIL_BCC)
   const from = normalizeEmailAddress(process.env.CALLBACK_EMAIL_FROM) || DEFAULT_CALLBACK_EMAIL_FROM
   const replyTo = normalizeEmailAddress(process.env.CALLBACK_EMAIL_REPLY_TO)
 
@@ -81,6 +111,7 @@ async function sendCallbackEmail(payload) {
     html: email.html,
     text: email.text,
     tags: buildCallbackEmailTags(payload),
+    ...(bcc.length ? { bcc } : {}),
     ...(replyTo ? { replyTo } : {}),
   })
 
@@ -111,7 +142,7 @@ async function forwardCallbackWebhook(payload) {
 }
 
 async function sendContactEmail(payload) {
-  const { apiKey, from, replyTo, to } = resolveContactEmailConfig(process.env)
+  const { apiKey, bcc, from, replyTo, to } = resolveContactEmailConfig(process.env)
 
   if (!apiKey || !to || !from) {
     return { ok: false, reason: 'email_not_configured' }
@@ -126,6 +157,7 @@ async function sendContactEmail(payload) {
     html: email.html,
     text: email.text,
     tags: buildContactEmailTags(payload),
+    ...(bcc.length ? { bcc } : {}),
     replyTo: replyTo || payload.email,
   })
 
@@ -137,39 +169,30 @@ async function sendContactEmail(payload) {
 }
 
 async function handleChat(body) {
-  const { messages = [], visitorProfile } = JSON.parse(body)
+  const parsed = parseJsonBody(body, API_LIMITS.chatBodyBytes)
+  if (parsed.response) return parsed.response
+
+  const validation = validateChatPayload(parsed.data)
+  if (validation.error) return buildJsonResponse({ error: validation.error }, 400)
+
+  const { messages, visitorProfile } = validation.payload
   const result = streamText({
     model: gateway(CHATBOT_MODEL),
     system: buildRequestSystemPrompt(visitorProfile),
-    messages: convertToModelMessages(Array.isArray(messages) ? messages : []),
+    messages: convertToModelMessages(messages),
   })
 
   return result.toUIMessageStreamResponse()
 }
 
 async function handleCallback(body) {
-  const parsed = JSON.parse(body)
-  const name = parsed.name?.trim?.() ?? ''
-  const phone = parsed.phone?.trim?.() ?? ''
-  const bestTime = parsed.bestTime?.trim?.() ?? ''
-  const location = parsed.location?.trim?.() ?? ''
-  const service = parsed.service?.trim?.() ?? ''
+  const parsed = parseJsonBody(body, API_LIMITS.callbackBodyBytes)
+  if (parsed.response) return parsed.response
 
-  if (!name || !phone || !bestTime) {
-    return new Response(JSON.stringify({ error: 'name, phone, and bestTime are required' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    })
-  }
+  const validation = validateCallbackPayload(parsed.data)
+  if (validation.error) return buildJsonResponse({ error: validation.error }, 400)
 
-  const payload = {
-    at: new Date().toISOString(),
-    bestTime,
-    location,
-    name,
-    phone,
-    service,
-  }
+  const payload = validation.payload
 
   const [emailResult, webhookResult] = await Promise.all([
     sendCallbackEmail(payload),
@@ -177,64 +200,34 @@ async function handleCallback(body) {
   ])
 
   if (!emailResult.ok && !webhookResult.ok) {
-    return new Response(JSON.stringify({ error: 'Callback delivery is not configured' }), {
-      status: 503,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return buildJsonResponse({ error: 'Callback delivery is not configured.' }, 503)
   }
 
-  return new Response(
-    JSON.stringify({
-      delivered: {
-        email: emailResult.ok,
-        webhook: webhookResult.ok,
-      },
-      ok: true,
-    }),
-    {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
+  return buildJsonResponse({
+    delivered: {
+      email: emailResult.ok,
+      webhook: webhookResult.ok,
     },
-  )
+    ok: true,
+  })
 }
 
 async function handleContact(body) {
-  const parsed = JSON.parse(body)
-  const name = parsed.name?.trim?.() ?? ''
-  const email = parsed.email?.trim?.() ?? ''
-  const phone = parsed.phone?.trim?.() ?? ''
-  const subject = parsed.subject?.trim?.() ?? ''
-  const message = parsed.message?.trim?.() ?? ''
+  const parsed = parseJsonBody(body, API_LIMITS.contactBodyBytes)
+  if (parsed.response) return parsed.response
 
-  if (!name || !email || !message) {
-    return new Response(JSON.stringify({ error: 'name, email, and message are required' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    })
-  }
+  const validation = validateContactPayload(parsed.data)
+  if (validation.error) return buildJsonResponse({ error: validation.error }, 400)
 
-  const payload = {
-    at: new Date().toISOString(),
-    email,
-    message,
-    name,
-    phone,
-    subject,
-  }
+  const payload = validation.payload
 
   const emailResult = await sendContactEmail(payload)
 
   if (!emailResult.ok) {
-    return new Response(JSON.stringify({ error: 'Contact form email delivery is not configured' }), {
-      status: 503,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return buildJsonResponse({ error: 'Contact form email delivery is not configured.' }, 503)
   }
 
-  return new Response(JSON.stringify({ delivered: { email: true }, ok: true }), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
-  })
+  return buildJsonResponse({ delivered: { email: true }, ok: true })
 }
 
 const PORT = 3001
@@ -276,7 +269,19 @@ const server = createServer(async (req, res) => {
     if (req.url === '/api/chat' || req.url === '/api/chat/') {
       if (!process.env.AI_GATEWAY_API_KEY) {
         res.writeHead(500, { 'Content-Type': 'application/json', ...corsHeaders })
-        res.end(JSON.stringify({ error: 'AI_GATEWAY_API_KEY not set' }))
+        res.end(JSON.stringify({ error: 'Chat is not configured.' }))
+        return
+      }
+
+      const rateLimit = checkRateLimit({
+        clientId: getDevClientId(req),
+        limit: API_LIMITS.chatMaxRequests,
+        route: 'chat',
+      })
+      if (!rateLimit.ok) {
+        const response = buildRateLimitResponse(rateLimit)
+        res.writeHead(response.status, { ...Object.fromEntries(response.headers.entries()), ...corsHeaders })
+        res.end(await response.text())
         return
       }
 
@@ -290,6 +295,18 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.url === '/api/callback' || req.url === '/api/callback/') {
+      const rateLimit = checkRateLimit({
+        clientId: getDevClientId(req),
+        limit: API_LIMITS.callbackMaxRequests,
+        route: 'callback',
+      })
+      if (!rateLimit.ok) {
+        const response = buildRateLimitResponse(rateLimit)
+        res.writeHead(response.status, { ...Object.fromEntries(response.headers.entries()), ...corsHeaders })
+        res.end(await response.text())
+        return
+      }
+
       const response = await handleCallback(body)
       res.writeHead(response.status, { ...Object.fromEntries(response.headers.entries()), ...corsHeaders })
       const responseText = await response.text()
@@ -298,6 +315,18 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.url === '/api/contact' || req.url === '/api/contact/') {
+      const rateLimit = checkRateLimit({
+        clientId: getDevClientId(req),
+        limit: API_LIMITS.contactMaxRequests,
+        route: 'contact',
+      })
+      if (!rateLimit.ok) {
+        const response = buildRateLimitResponse(rateLimit)
+        res.writeHead(response.status, { ...Object.fromEntries(response.headers.entries()), ...corsHeaders })
+        res.end(await response.text())
+        return
+      }
+
       const response = await handleContact(body)
       res.writeHead(response.status, { ...Object.fromEntries(response.headers.entries()), ...corsHeaders })
       const responseText = await response.text()
@@ -310,7 +339,7 @@ const server = createServer(async (req, res) => {
   } catch (e) {
     console.error(e)
     res.writeHead(500, { 'Content-Type': 'application/json', ...corsHeaders })
-    res.end(JSON.stringify({ error: e instanceof Error ? e.message : 'Request failed' }))
+    res.end(JSON.stringify({ error: 'Request failed. Please try again.' }))
   }
 })
 

@@ -143,9 +143,11 @@ Recommended email provider pattern:
 - verify the sending domain or subdomain
 - set `RESEND_API_KEY`
 - set `CALLBACK_EMAIL_TO`
+- optionally set `CALLBACK_EMAIL_BCC`
 - set `CALLBACK_EMAIL_FROM`
 - optionally set `CALLBACK_EMAIL_REPLY_TO`
 - optionally set `CONTACT_EMAIL_TO`
+- optionally set `CONTACT_EMAIL_BCC`
 - optionally set `CONTACT_EMAIL_FROM`
 - optionally set `CONTACT_EMAIL_REPLY_TO`
 - send a direct test request to `/api/callback`

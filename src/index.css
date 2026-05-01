@@ -50,7 +50,7 @@ html.dark {
   --cream-dark: #141418;
   --ink:        #EDE8F8;
   --ink-mid:    #C8BFDF;
-  --muted:      #8A7EA0;
+  --muted:      #C8BFDF;
 
   /* card / form surfaces */
   --card-bg:        rgba(255,255,255,0.04);
@@ -64,6 +64,9 @@ html.dark {
   --card-border:    rgba(123,94,167,0.1);
   --input-bg:       rgba(255,255,255,0.55);
   --input-border:   rgba(123,94,167,0.14);
+  --error-text:      #B42318;
+  --error-bg:        rgba(232, 93, 93, 0.08);
+  --error-border:    rgba(232, 93, 93, 0.22);
 
   /* Navbar */
   --nav-bg-scrolled:     rgba(255,255,255,0.88);
@@ -81,6 +84,9 @@ html.dark {
   --nav-link-color:      rgba(255,255,255,0.7);
   --nav-link-hover-bg:   rgba(184,159,216,0.09);
   --nav-mobile-bg:       rgba(13,13,15,0.97);
+  --error-text:           #FCA5A5;
+  --error-bg:             rgba(185, 28, 28, 0.16);
+  --error-border:         rgba(248, 113, 113, 0.3);
 }
 
 /* ── Reset ───────────────────────────────────────── */
@@ -90,9 +96,14 @@ html {
   scroll-behavior: smooth;
   font-family: var(--font-body);
   font-size: 16px;
+  color-scheme: light;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+}
+
+html.dark {
+  color-scheme: dark;
 }
 
 body {
@@ -105,7 +116,7 @@ body {
 
 html.dark body {
   background-color: #0D0D0F;
-  color: var(--cream);
+  color: var(--ink);
 }
 
 /* ── Type scale ──────────────────────────────────── */
@@ -469,6 +480,10 @@ html.dark .form-input {
 }
 html.dark .form-input::placeholder {
   color: rgba(169,139,255,0.35) !important;
+}
+html.dark .form-input option {
+  background: #141418;
+  color: var(--ink);
 }
 
 /* Contact map border */
