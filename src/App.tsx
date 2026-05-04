@@ -74,6 +74,18 @@ function BackToTopButton() {
 function AppLayout() {
   const [isDark, setIsDark] = useState(() => initTheme());
 
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const syncSystemTheme = (event: MediaQueryListEvent) => {
+      if (localStorage.getItem('theme')) return;
+      document.documentElement.classList.toggle('dark', event.matches);
+      setIsDark(event.matches);
+    };
+
+    mediaQuery.addEventListener('change', syncSystemTheme);
+    return () => mediaQuery.removeEventListener('change', syncSystemTheme);
+  }, []);
+
   const handleToggleTheme = () => {
     setIsDark((prev) => toggleTheme(prev));
   };

@@ -58,6 +58,19 @@ function isGreetingPrompt(text: string) {
   return /^(hi|hello|hey|good\s+(morning|afternoon|evening))(?:[.!?,\s]*)$/i.test(text.trim())
 }
 
+function isFallbackAssistantText(text: string) {
+  const lowered = text.toLowerCase()
+  const uncertainty =
+    /\b(i do not know|i don't know|i am not sure|i'm not sure|cannot answer|can't answer)\b/.test(lowered) ||
+    lowered.includes('do not guess')
+  const humanPath =
+    lowered.includes(ISOKE_CONTENT.contact.mainPhoneDisplay.toLowerCase()) ||
+    lowered.includes(ISOKE_CONTENT.contact.email.toLowerCase()) ||
+    lowered.includes('request a callback')
+
+  return uncertainty && humanPath
+}
+
 function classifyStageFromInput(text: string, isOutsideBusinessHours: boolean): ChatStage | null {
   const lowered = text.toLowerCase()
 
@@ -182,6 +195,8 @@ export function ChatWidget() {
   const [callbackNotice, setCallbackNotice] = useState<CallbackNotice | null>(null)
   const [revealedAssistantText, setRevealedAssistantText] = useState<Record<string, string>>({})
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const profilePromptRef = useRef<HTMLDivElement>(null)
+  const profileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const revealTimersRef = useRef<Record<string, ReturnType<typeof window.setInterval>>>({})
   const assistantTargetsRef = useRef<Record<string, string>>({})
@@ -352,6 +367,15 @@ export function ChatWidget() {
       }
     }
 
+    const assistantFallback = lastMessage.role === 'assistant' && isFallbackAssistantText(lastText)
+
+    if (assistantFallback) {
+      setChatStage((current) =>
+        current === 'after_hours' || current === 'callback_form' || current === 'callback_offer' ? current : 'fallback',
+      )
+      return
+    }
+
     if (!visitorProfile.nameResolved && messages.length >= 2 && !showCallbackForm) {
       setChatStage((current) =>
         current === 'callback_offer' || current === 'callback_form' ? current : 'collecting_name',
@@ -430,8 +454,10 @@ export function ChatWidget() {
   }, [messages, revealedAssistantText])
 
   useEffect(() => {
+    const revealTimers = revealTimersRef.current
+
     return () => {
-      Object.values(revealTimersRef.current).forEach((timerId) => window.clearInterval(timerId))
+      Object.values(revealTimers).forEach((timerId) => window.clearInterval(timerId))
     }
   }, [])
 
@@ -852,6 +878,19 @@ export function ChatWidget() {
           }
         : null
 
+  const profilePromptKey = profilePrompt?.placeholder ?? ''
+
+  useEffect(() => {
+    if (!profilePromptKey || showCallbackForm) return
+
+    const timeoutId = window.setTimeout(() => {
+      profilePromptRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      profileInputRef.current?.focus({ preventScroll: true })
+    }, 80)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [profilePromptKey, showCallbackForm])
+
   return (
     <>
       <AnimatePresence>
@@ -1209,8 +1248,8 @@ export function ChatWidget() {
                   style={{
                     alignSelf: 'stretch',
                     marginBottom: 4,
-                    padding: '18px 18px 16px',
-                    borderRadius: 22,
+                    padding: '14px',
+                    borderRadius: 20,
                     background: widgetTheme.surfaceBg,
                     border: `1px solid ${widgetTheme.softBorder}`,
                     boxShadow: '0 12px 30px rgba(30,18,48,0.06)',
@@ -1219,12 +1258,12 @@ export function ChatWidget() {
                   <div
                     style={{
                       alignSelf: 'stretch',
-                      marginBottom: 14,
+                      marginBottom: 10,
                     }}
                   >
                     <div
                       style={{
-                        marginBottom: 6,
+                        marginBottom: 5,
                         fontSize: 11,
                         fontWeight: 700,
                         letterSpacing: '0.12em',
@@ -1237,10 +1276,10 @@ export function ChatWidget() {
                     </div>
                     <div
                       style={{
-                        padding: '14px 16px',
+                        padding: '12px 14px',
                         borderRadius: '18px 18px 18px 8px',
-                        fontSize: 15,
-                        lineHeight: 1.72,
+                        fontSize: 14,
+                        lineHeight: 1.55,
                         letterSpacing: '0.005em',
                         background: widgetTheme.assistantBg,
                         border: `1px solid ${widgetTheme.assistantBorder}`,
@@ -1248,44 +1287,11 @@ export function ChatWidget() {
                         boxShadow: '0 10px 24px rgba(30,18,48,0.05)',
                       }}
                     >
-                      Hi, I&apos;m Isoke&apos;s concierge assistant. I can help you explore services, find the right
-                      contact option, or connect you with the team.
+                      Hi, I can help with services, contact details, or a callback.
                     </div>
                   </div>
 
-                  <div
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      marginBottom: 12,
-                      padding: '6px 10px',
-                      borderRadius: 999,
-                      background: widgetTheme.badgeBg,
-                      color: widgetTheme.badgeText,
-                      fontSize: 11,
-                      fontWeight: 700,
-                      letterSpacing: '0.14em',
-                      textTransform: 'uppercase',
-                    }}
-                  >
-                    <Sparkles size={13} />
-                    Warm concierge
-                  </div>
-
-                  <div
-                    style={{
-                      color: widgetTheme.text,
-                      fontSize: 15,
-                      lineHeight: 1.72,
-                      letterSpacing: '0.005em',
-                      marginBottom: 16,
-                    }}
-                  >
-                    Choose a quick path below, or type your question and I&apos;ll guide you from there.
-                  </div>
-
-                  <div style={{ display: 'grid', gap: 8 }}>
+                  <div style={{ display: 'grid', gap: 7 }}>
                     {WELCOME_ACTIONS.map((action) => (
                       <button
                         key={action.id}
@@ -1293,8 +1299,8 @@ export function ChatWidget() {
                         onClick={() => onWelcomeAction(action)}
                         style={{
                           textAlign: 'left',
-                          padding: '12px 14px',
-                          borderRadius: 16,
+                          padding: '10px 12px',
+                          borderRadius: 14,
                           border: `1px solid ${widgetTheme.actionBorder}`,
                           background: widgetTheme.surfaceSecondaryBg,
                           color: widgetTheme.text,
@@ -1304,12 +1310,12 @@ export function ChatWidget() {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          gap: 12,
+                          gap: 10,
                         }}
                       >
                         <div>
-                          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>{action.label}</div>
-                          <div style={{ fontSize: 12.5, lineHeight: 1.55, color: 'var(--muted)' }}>
+                          <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 2 }}>{action.label}</div>
+                          <div style={{ fontSize: 12, lineHeight: 1.42, color: 'var(--muted)' }}>
                             {action.description}
                           </div>
                         </div>
@@ -1726,6 +1732,7 @@ export function ChatWidget() {
                   </div>
 
                   <div
+                    ref={profilePromptRef}
                     style={{
                       alignSelf: 'stretch',
                       padding: '16px',
@@ -1762,6 +1769,7 @@ export function ChatWidget() {
 
                     <form onSubmit={handleProfileSubmit} style={{ display: 'grid', gap: 10 }}>
                       <input
+                        ref={profileInputRef}
                         type="text"
                         value={profileDraft}
                         onChange={(e) => setProfileDraft(e.target.value)}

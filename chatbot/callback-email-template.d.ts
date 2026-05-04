@@ -21,4 +21,5 @@ export declare function buildCallbackEmailTags(payload: CallbackPayload): Array<
 }>
 
 export declare function normalizeEmailAddress(value: string | undefined): string
+export declare function normalizeEmailList(value: string | undefined): string[]
 export declare function normalizeEnvValue(value: string | undefined): string

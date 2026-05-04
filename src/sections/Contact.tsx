@@ -46,6 +46,7 @@ const inputBase: React.CSSProperties = {
   padding: '11px 14px', fontSize: 14,
   fontFamily: "'Plus Jakarta Sans', sans-serif",
   color: 'var(--ink)',
+  background: 'var(--input-bg)',
   outline: 'none',
   transition: 'border-color 0.2s, background 0.2s',
 };
@@ -198,16 +199,16 @@ export function Contact() {
                       <input id="name" name="name" type="text" autoComplete="name"
                         value={form.name} onChange={onChange} placeholder="Jane Smith"
                         className="form-input"
-                        style={{ ...inputBase, background: 'rgba(255,255,255,0.55)', border: '1px solid ' + (errors.name ? '#e85d5d' : 'rgba(123,94,167,0.14)') }} />
-                      {errors.name && <p style={{ fontSize: 11, color: '#e85d5d', marginTop: 3 }}>{errors.name}</p>}
+                        style={{ ...inputBase, border: '1px solid ' + (errors.name ? 'var(--error-text)' : 'var(--input-border)') }} />
+                      {errors.name && <p style={{ fontSize: 11, color: 'var(--error-text)', marginTop: 3 }}>{errors.name}</p>}
                     </div>
                     <div>
                       <label htmlFor="email" style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--muted)', marginBottom: 7 }}>Email <span style={{ color: '#e85d5d' }}>*</span></label>
                       <input id="email" name="email" type="email" autoComplete="email"
                         value={form.email} onChange={onChange} placeholder="jane@example.com"
                         className="form-input"
-                        style={{ ...inputBase, background: 'rgba(255,255,255,0.55)', border: '1px solid ' + (errors.email ? '#e85d5d' : 'rgba(123,94,167,0.14)') }} />
-                      {errors.email && <p style={{ fontSize: 11, color: '#e85d5d', marginTop: 3 }}>{errors.email}</p>}
+                        style={{ ...inputBase, border: '1px solid ' + (errors.email ? 'var(--error-text)' : 'var(--input-border)') }} />
+                      {errors.email && <p style={{ fontSize: 11, color: 'var(--error-text)', marginTop: 3 }}>{errors.email}</p>}
                     </div>
                   </div>
 
@@ -217,13 +218,13 @@ export function Contact() {
                       <input id="phone" name="phone" type="tel" autoComplete="tel"
                         value={form.phone} onChange={onChange} placeholder="(814) 000-0000"
                         className="form-input"
-                        style={{ ...inputBase, background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(123,94,167,0.14)' }} />
+                        style={{ ...inputBase, border: '1px solid var(--input-border)' }} />
                     </div>
                     <div>
                       <label htmlFor="subject" style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--muted)', marginBottom: 7 }}>Subject</label>
                       <select id="subject" name="subject" value={form.subject} onChange={onChange}
                         className="form-input"
-                        style={{ ...inputBase, background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(123,94,167,0.14)' }}>
+                        style={{ ...inputBase, border: '1px solid var(--input-border)' }}>
                         <option value="">Select Service</option>
                         <option value="Community Participation Support">Community Participation Support</option>
                         <option value="Companion Services">Companion Services</option>
@@ -240,8 +241,8 @@ export function Contact() {
                     <textarea id="message" name="message" rows={5}
                       value={form.message} onChange={onChange} placeholder="Tell us how we can help…"
                       className="form-input"
-                      style={{ ...inputBase, background: 'rgba(255,255,255,0.55)', resize: 'none', border: '1px solid ' + (errors.message ? '#e85d5d' : 'rgba(123,94,167,0.14)') }} />
-                    {errors.message && <p style={{ fontSize: 11, color: '#e85d5d', marginTop: 3 }}>{errors.message}</p>}
+                      style={{ ...inputBase, resize: 'none', border: '1px solid ' + (errors.message ? 'var(--error-text)' : 'var(--input-border)') }} />
+                    {errors.message && <p style={{ fontSize: 11, color: 'var(--error-text)', marginTop: 3 }}>{errors.message}</p>}
                   </div>
 
                   {submitError && (
@@ -250,9 +251,9 @@ export function Contact() {
                         marginBottom: 16,
                         padding: '11px 13px',
                         borderRadius: 12,
-                        border: '1px solid rgba(232, 93, 93, 0.22)',
-                        background: 'rgba(232, 93, 93, 0.08)',
-                        color: '#b42318',
+                        border: '1px solid var(--error-border)',
+                        background: 'var(--error-bg)',
+                        color: 'var(--error-text)',
                         fontSize: 12.5,
                         lineHeight: 1.55,
                       }}

@@ -18,6 +18,7 @@ Primary reference documents:
 - Shared callback email template: `chatbot/callback-email-template.js`
 - Shared contact email template: `chatbot/contact-email-template.js`
 - Flow and analytics helpers: `src/lib/chatbot/flow.ts`, `src/lib/chatbot/analytics.ts`
+- Shared API guardrails: `chatbot/api-guardrails.js`
 
 Runtime shape:
 1. A proactive teaser can appear shortly after page load near the launcher unless the visitor has dismissed it.
@@ -112,6 +113,9 @@ Delivery behavior:
 - defaults sender to `intake@callback.isokedevelops.com`
 - supports optional `replyTo`
 - supports optional webhook forwarding
+- validates required fields and phone format server-side before delivery
+- rate-limits callback submissions per client
+- rejects oversized callback request bodies
 - attaches Resend tags:
   - `type=callback_request`
   - `client=isoke`
@@ -123,10 +127,12 @@ Environment variables:
 - `AI_GATEWAY_API_KEY`
 - `RESEND_API_KEY`
 - `CALLBACK_EMAIL_TO`
+- `CALLBACK_EMAIL_BCC` optional
 - `CALLBACK_EMAIL_FROM`
 - `CALLBACK_EMAIL_REPLY_TO` optional
 - `CALLBACK_WEBHOOK_URL` optional
 - `CONTACT_EMAIL_TO` optional, falls back to `CALLBACK_EMAIL_TO`
+- `CONTACT_EMAIL_BCC` optional, falls back to `CALLBACK_EMAIL_BCC`
 - `CONTACT_EMAIL_FROM` optional, falls back to `CALLBACK_EMAIL_FROM`
 - `CONTACT_EMAIL_REPLY_TO` optional, falls back to `CALLBACK_EMAIL_REPLY_TO`
 
@@ -149,6 +155,9 @@ Delivery behavior:
 - uses the same verified sender domain pattern as the callback route
 - defaults to the callback inbox/sender env vars when contact-specific env vars are not set
 - uses the visitor email as `replyTo` when no explicit reply-to env var is configured
+- validates required fields, email format, and optional phone format server-side
+- rate-limits contact submissions per client
+- rejects oversized contact request bodies
 - attaches Resend tags:
   - `type=contact_form_submission`
   - `client=isoke`
@@ -196,6 +205,20 @@ Default behavior:
 - no vendor dependency
 - optional future integration through `window.__ISOKE_CHATBOT_ANALYTICS__`
 
+## API Guardrails
+Shared API hardening lives in `chatbot/api-guardrails.js` and is used by both Vercel routes and the local `scripts/dev-api.mjs` server.
+
+Current protections:
+- per-client in-memory rate limits for chat, callback, and contact routes
+- request body byte limits for chat, callback, and contact routes
+- chat message count and total text limits
+- server-side callback validation for name, phone, and best time
+- server-side contact validation for name, email, message, and optional phone
+- visitor profile normalization before prompt injection
+- generic visitor-facing API errors with detailed provider errors limited to server logs
+
+The in-memory rate limiter is a lightweight baseline for serverless deployments. For higher-traffic production use, move the counters to a durable store such as Vercel KV, Upstash Redis, or another shared rate-limit backend.
+
 ## Local Development
 Use:
 ```bash
@@ -231,7 +254,10 @@ Post-deploy checks:
 - callback form opens from starter, direct callback ask, and guided callback chips
 - callback form pre-fills known name, city/state, and matched service when available
 - callback submission succeeds end to end
+- callback rejects invalid phone numbers and oversized bodies
 - contact form submission succeeds end to end
+- contact form rejects invalid email/phone values and oversized bodies
+- repeated chat, callback, and contact requests eventually return HTTP 429
 - fallback states provide direct contact or callback options
 - action chips remain relevant to the conversation
 - composer supports `Shift+Enter`

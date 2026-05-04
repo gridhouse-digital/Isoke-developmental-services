@@ -1,9 +1,19 @@
 import { Resend } from 'resend'
 import {
+  API_LIMITS,
+  buildJsonResponse,
+  buildRateLimitResponse,
+  checkRateLimit,
+  getClientId,
+  readJsonBody,
+  validateCallbackPayload,
+} from '../chatbot/api-guardrails.js'
+import {
   DEFAULT_CALLBACK_EMAIL_FROM,
   buildCallbackEmailContent,
   buildCallbackEmailTags,
   normalizeEmailAddress,
+  normalizeEmailList,
   normalizeEnvValue,
   type CallbackPayload,
 } from '../chatbot/callback-email-template.js'
@@ -14,12 +24,14 @@ import {
  *
  * Delivery options:
  * - Resend email when RESEND_API_KEY, CALLBACK_EMAIL_TO, and CALLBACK_EMAIL_FROM are set
+ * - Optional blind copy when CALLBACK_EMAIL_BCC is set
  * - Optional webhook forwarding when CALLBACK_WEBHOOK_URL is set
  */
 
 async function sendCallbackEmail(payload: CallbackPayload) {
   const apiKey = normalizeEnvValue(process.env.RESEND_API_KEY)
   const to = normalizeEmailAddress(process.env.CALLBACK_EMAIL_TO)
+  const bcc = normalizeEmailList(process.env.CALLBACK_EMAIL_BCC)
   const from = normalizeEmailAddress(process.env.CALLBACK_EMAIL_FROM) || DEFAULT_CALLBACK_EMAIL_FROM
   const replyTo = normalizeEmailAddress(process.env.CALLBACK_EMAIL_REPLY_TO)
 
@@ -36,6 +48,7 @@ async function sendCallbackEmail(payload: CallbackPayload) {
     html: email.html,
     text: email.text,
     tags: buildCallbackEmailTags(payload),
+    ...(bcc.length ? { bcc } : {}),
     ...(replyTo ? { replyTo } : {}),
   })
 
@@ -67,35 +80,20 @@ async function forwardCallbackWebhook(payload: CallbackPayload) {
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as {
-      bestTime?: string
-      location?: string
-      name?: string
-      phone?: string
-      service?: string
-    }
+    const rateLimit = checkRateLimit({
+      clientId: getClientId(req),
+      limit: API_LIMITS.callbackMaxRequests,
+      route: 'callback',
+    })
+    if (!rateLimit.ok) return buildRateLimitResponse(rateLimit)
 
-    const name = body.name?.trim() ?? ''
-    const phone = body.phone?.trim() ?? ''
-    const bestTime = body.bestTime?.trim() ?? ''
-    const location = body.location?.trim() ?? ''
-    const service = body.service?.trim() ?? ''
+    const body = await readJsonBody(req, API_LIMITS.callbackBodyBytes)
+    if (body.error) return buildJsonResponse({ error: body.error }, body.status)
 
-    if (!name || !phone || !bestTime) {
-      return new Response(JSON.stringify({ error: 'name, phone, and bestTime are required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    }
+    const validation = validateCallbackPayload(body.data)
+    if (validation.error) return buildJsonResponse({ error: validation.error }, 400)
 
-    const payload: CallbackPayload = {
-      at: new Date().toISOString(),
-      bestTime,
-      location,
-      name,
-      phone,
-      service,
-    }
+    const payload: CallbackPayload = validation.payload
 
     const [emailResult, webhookResult] = await Promise.all([
       sendCallbackEmail(payload),
@@ -103,31 +101,21 @@ export async function POST(req: Request) {
     ])
 
     if (!emailResult.ok && !webhookResult.ok) {
-      return new Response(JSON.stringify({ error: 'Callback delivery is not configured' }), {
-        status: 503,
-        headers: { 'Content-Type': 'application/json' },
-      })
+      return buildJsonResponse({ error: 'Callback delivery is not configured.' }, 503)
     }
 
-    return new Response(
-      JSON.stringify({
-        delivered: {
-          email: emailResult.ok,
-          webhook: webhookResult.ok,
-        },
-        ok: true,
-      }),
-      {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
+    return buildJsonResponse({
+      delivered: {
+        email: emailResult.ok,
+        webhook: webhookResult.ok,
       },
-    )
+      ok: true,
+    })
   } catch (e) {
     console.error(e)
-    const message = e instanceof Error ? e.message : 'Callback failed'
-    return new Response(JSON.stringify({ error: message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return buildJsonResponse(
+      { error: 'Callback request could not be sent. Please call the team directly.' },
+      500,
+    )
   }
 }

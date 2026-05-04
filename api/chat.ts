@@ -1,4 +1,13 @@
 import { convertToModelMessages, gateway, streamText, type UIMessage } from 'ai'
+import {
+  API_LIMITS,
+  buildJsonResponse,
+  buildRateLimitResponse,
+  checkRateLimit,
+  getClientId,
+  readJsonBody,
+  validateChatPayload,
+} from '../chatbot/api-guardrails.js'
 import { CHATBOT_MODEL, buildIsokeSystemPrompt } from '../chatbot/isoke-content.js'
 
 const ISOKE_SYSTEM_PROMPT = buildIsokeSystemPrompt()
@@ -28,29 +37,33 @@ export const config = { runtime: 'edge' }
 
 export async function POST(req: Request) {
   if (!process.env.AI_GATEWAY_API_KEY) {
-    return new Response(JSON.stringify({ error: 'AI_GATEWAY_API_KEY not set' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return buildJsonResponse({ error: 'Chat is not configured.' }, 500)
   }
 
   try {
-    const { messages = [], visitorProfile } = (await req.json()) as {
-      messages?: UIMessage[]
-      visitorProfile?: { cityState?: string; firstName?: string }
-    }
+    const rateLimit = checkRateLimit({
+      clientId: getClientId(req),
+      limit: API_LIMITS.chatMaxRequests,
+      route: 'chat',
+    })
+    if (!rateLimit.ok) return buildRateLimitResponse(rateLimit)
+
+    const body = await readJsonBody(req, API_LIMITS.chatBodyBytes)
+    if (body.error) return buildJsonResponse({ error: body.error }, body.status)
+
+    const validation = validateChatPayload(body.data)
+    if (validation.error) return buildJsonResponse({ error: validation.error }, 400)
+
+    const { messages, visitorProfile } = validation.payload
     const result = streamText({
       model: gateway(CHATBOT_MODEL),
       system: buildRequestSystemPrompt(visitorProfile),
-      messages: convertToModelMessages(Array.isArray(messages) ? messages : []),
+      messages: convertToModelMessages(messages as UIMessage[]),
     })
 
     return result.toUIMessageStreamResponse()
   } catch (e) {
     console.error(e)
-    return new Response(JSON.stringify({ error: 'Chat failed' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return buildJsonResponse({ error: 'Chat failed. Please try again or call the team directly.' }, 500)
   }
 }

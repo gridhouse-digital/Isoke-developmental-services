@@ -4,7 +4,8 @@ export function cn(...classes: (string | undefined | false | null)[]): string {
 
 export function initTheme() {
   const stored = localStorage.getItem('theme');
-  const isDark = stored === 'dark';
+  const systemPrefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+  const isDark = stored ? stored === 'dark' : systemPrefersDark;
   document.documentElement.classList.toggle('dark', isDark);
   return isDark;
 }

@@ -1,5 +1,14 @@
 import { Resend } from 'resend'
 import {
+  API_LIMITS,
+  buildJsonResponse,
+  buildRateLimitResponse,
+  checkRateLimit,
+  getClientId,
+  readJsonBody,
+  validateContactPayload,
+} from '../chatbot/api-guardrails.js'
+import {
   buildContactEmailContent,
   buildContactEmailTags,
   resolveContactEmailConfig,
@@ -12,10 +21,11 @@ import {
  *
  * Delivery options:
  * - Resend email when RESEND_API_KEY and recipient/sender env vars are configured
+ * - Optional blind copy when CONTACT_EMAIL_BCC or CALLBACK_EMAIL_BCC is set
  */
 
 async function sendContactEmail(payload: ContactPayload) {
-  const { apiKey, from, replyTo, to } = resolveContactEmailConfig(process.env)
+  const { apiKey, bcc, from, replyTo, to } = resolveContactEmailConfig(process.env)
 
   if (!apiKey || !to || !from) {
     return { ok: false as const, reason: 'email_not_configured' }
@@ -30,6 +40,7 @@ async function sendContactEmail(payload: ContactPayload) {
     html: email.html,
     text: email.text,
     tags: buildContactEmailTags(payload),
+    ...(bcc.length ? { bcc } : {}),
     replyTo: replyTo || payload.email,
   })
 
@@ -42,55 +53,33 @@ async function sendContactEmail(payload: ContactPayload) {
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as {
-      email?: string
-      message?: string
-      name?: string
-      phone?: string
-      subject?: string
-    }
+    const rateLimit = checkRateLimit({
+      clientId: getClientId(req),
+      limit: API_LIMITS.contactMaxRequests,
+      route: 'contact',
+    })
+    if (!rateLimit.ok) return buildRateLimitResponse(rateLimit)
 
-    const name = body.name?.trim() ?? ''
-    const email = body.email?.trim() ?? ''
-    const phone = body.phone?.trim() ?? ''
-    const subject = body.subject?.trim() ?? ''
-    const message = body.message?.trim() ?? ''
+    const body = await readJsonBody(req, API_LIMITS.contactBodyBytes)
+    if (body.error) return buildJsonResponse({ error: body.error }, body.status)
 
-    if (!name || !email || !message) {
-      return new Response(JSON.stringify({ error: 'name, email, and message are required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    }
+    const validation = validateContactPayload(body.data)
+    if (validation.error) return buildJsonResponse({ error: validation.error }, 400)
 
-    const payload: ContactPayload = {
-      at: new Date().toISOString(),
-      email,
-      message,
-      name,
-      phone,
-      subject,
-    }
+    const payload: ContactPayload = validation.payload
 
     const emailResult = await sendContactEmail(payload)
 
     if (!emailResult.ok) {
-      return new Response(JSON.stringify({ error: 'Contact form email delivery is not configured' }), {
-        status: 503,
-        headers: { 'Content-Type': 'application/json' },
-      })
+      return buildJsonResponse({ error: 'Contact form email delivery is not configured.' }, 503)
     }
 
-    return new Response(JSON.stringify({ delivered: { email: true }, ok: true }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return buildJsonResponse({ delivered: { email: true }, ok: true })
   } catch (e) {
     console.error(e)
-    const message = e instanceof Error ? e.message : 'Contact form submission failed'
-    return new Response(JSON.stringify({ error: message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return buildJsonResponse(
+      { error: 'Contact form submission could not be sent. Please call or email the team directly.' },
+      500,
+    )
   }
 }

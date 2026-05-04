@@ -120,13 +120,16 @@ export function Navbar({ isDark, onToggleTheme }: NavbarProps) {
     return () => window.removeEventListener('scroll', fn);
   }, []);
 
-  useEffect(() => { setMobileOpen(false); }, [location]);
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setMobileOpen(false), 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [location]);
 
   // Track which section is in view
   useEffect(() => {
     if (location.pathname !== '/') {
-      setActiveId('');
-      return;
+      const timeoutId = window.setTimeout(() => setActiveId(''), 0);
+      return () => window.clearTimeout(timeoutId);
     }
 
     const ids = links
