@@ -30,6 +30,9 @@ Document the approved facts in a structured content source:
   businessName: '',
   mission: '',
   audience: '',
+  capabilities: [],
+  limitations: [],
+  privacyNotice: '',
   onboarding: {
     teaserTitle: '',
     teaserBody: '',
@@ -46,6 +49,7 @@ Document the approved facts in a structured content source:
   },
   services: [
     {
+      aliases: [],
       name: '',
       shortDescription: '',
       prompt: ''
@@ -57,6 +61,7 @@ Document the approved facts in a structured content source:
 Rule:
 - keep facts in structured data
 - keep behavior in prompt rules
+- include capabilities, limitations, privacy notice, and common service aliases before wiring the UI
 
 ## 3. Intent Catalog Template
 Define a minimal intent set before UI work:
@@ -82,21 +87,26 @@ For each intent, define:
 ## 4. Conversation Design Rules
 - narrow the scope before broadening it
 - every turn should move the user toward a useful next step
+- identify the bot as an AI concierge early in the opening experience
+- keep replies concise by default; lead with the answer and avoid broad service dumps unless the visitor asks broadly
 - do not rely on the model alone for operational flows
 - use structured forms for lead capture
 - use progressive profiling instead of asking for every detail up front
 - prefer city/state over browser geolocation for service routing
-- if a service, contact, or callback flow begins before the quick introduction is complete, finish the intro prompts first and only then reveal deferred assistant content or the callback form
+- if a service, contact, after-hours, or callback flow begins before the quick introduction is complete, answer or route first instead of blocking on intro prompts
 - once light profile data is collected, feed it into the next model request so the assistant can personalize the immediate follow-up naturally
 - for greeting-only turns after intro, consider a local personalized welcome response to avoid unnecessary model latency
 - design fallback and handoff explicitly
+- use a fallback style that admits uncertainty and gives the fastest human next steps
 - do not hallucinate business facts
 
 ## 5. Prompt Template
 Your prompt should cover:
 - role and tone
+- capabilities, limitations, and privacy notice
 - approved knowledge boundary
 - service and contact summary
+- concise response rules
 - after-hours rule
 - callback and escalation rule
 - fallback rule

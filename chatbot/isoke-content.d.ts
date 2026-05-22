@@ -1,4 +1,5 @@
 export type IsokeService = {
+  aliases: string[]
   name: string
   prompt: string
   shortDescription: string
@@ -23,6 +24,7 @@ export declare const ISOKE_CONTENT: {
   }
   audience: string
   businessName: string
+  capabilities: string[]
   contact: {
     afterHoursDisplay: string
     afterHoursHref: string
@@ -40,7 +42,9 @@ export declare const ISOKE_CONTENT: {
     teaserSecondaryText: string
     teaserTitle: string
   }
+  limitations: string[]
   mission: string
+  privacyNotice: string
   services: IsokeService[]
 }
 

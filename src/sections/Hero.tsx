@@ -78,29 +78,32 @@ export function Hero() {
             position: 'absolute',
             top: 0, bottom: 0, right: 0,
             width: '55%',
-            zIndex: 0,
           }}
           className="hero-image-panel"
         >
           <img
             src={slide.image}
             alt=""
+            className="hero-slide-image"
             style={{
               width: '100%', height: '100%',
               objectFit: 'cover', objectPosition: 'center top',
-              opacity: 0.22, mixBlendMode: 'luminosity',
             }}
           />
           {/* Left fade */}
-          <div style={{
-            position: 'absolute', top: 0, bottom: 0, left: 0, width: '60%',
-            background: 'linear-gradient(to right, #0e0818 0%, transparent 100%)',
-          }} />
+          <div
+            className="hero-slide-fade-left"
+            style={{
+              position: 'absolute', top: 0, bottom: 0, left: 0, width: '45%',
+            }}
+          />
           {/* Bottom fade */}
-          <div style={{
-            position: 'absolute', bottom: 0, left: 0, right: 0, height: 200,
-            background: 'linear-gradient(to top, #1E1230 0%, transparent 100%)',
-          }} />
+          <div
+            className="hero-slide-fade-bottom"
+            style={{
+              position: 'absolute', bottom: 0, left: 0, right: 0, height: 160,
+            }}
+          />
         </motion.div>
       </AnimatePresence>
 
