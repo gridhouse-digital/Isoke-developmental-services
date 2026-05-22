@@ -1,11 +1,24 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
-import { ArrowUpRight, ChevronRight, Clock3, LifeBuoy, MapPin, MessageCircle, PhoneCall, Sparkles, UserRound, X } from 'lucide-react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { ISOKE_CONTENT, WELCOME_ACTIONS, findServiceByText } from '../../chatbot/isoke-content.js'
+import { Clock3, LifeBuoy, MapPin, PhoneCall, UserRound } from 'lucide-react'
+import { ISOKE_CONTENT, WELCOME_ACTIONS } from '../../chatbot/isoke-content.js'
+import { CallbackForm } from './chatbot/CallbackForm'
+import { ChatLauncher } from './chatbot/ChatLauncher'
+import { ChatPanel } from './chatbot/ChatPanel'
+import { MessageList } from './chatbot/MessageList'
+import { ProfilePrompt } from './chatbot/ProfilePrompt'
+import type { CallbackDetails, CallbackNotice } from './chatbot/types'
 import { trackChatbotEvent } from '../lib/chatbot/analytics'
 import { deriveChatFlowState, type ChatAction, type ChatStage } from '../lib/chatbot/flow'
+import {
+  classifyChatInputIntent,
+  findLatestUserServiceMatch,
+  isCallbackRequest,
+  isFallbackAssistantText,
+  isGreetingPrompt,
+} from '../lib/chatbot/intents'
+import { reduceChatStage, type ChatStageTransition } from '../lib/chatbot/state'
 
 const OPEN_CHAT_EVENT = 'isoke-open-chat'
 const ASSISTANT_REVEAL_MS = 20
@@ -15,14 +28,6 @@ const CALLBACK_API_URL =
   typeof window !== 'undefined' && window.location.hostname === 'localhost'
     ? 'http://localhost:3001/api/callback'
     : '/api/callback'
-
-type CallbackDetails = {
-  bestTime: string
-  location?: string
-  name: string
-  phone: string
-  service: string
-}
 
 type VisitorProfile = {
   cityState: string
@@ -36,11 +41,6 @@ type ChatProfileContext = {
   firstName?: string
 }
 
-type CallbackNotice = {
-  tone: 'error' | 'success'
-  text: string
-}
-
 type PendingAction = 'callback' | null
 
 function messageText(parts: Array<{ text?: string; type: string }>): string {
@@ -48,41 +48,6 @@ function messageText(parts: Array<{ text?: string; type: string }>): string {
     .filter((part): part is { type: 'text'; text: string } => part.type === 'text' && typeof part.text === 'string')
     .map((part) => part.text)
     .join('')
-}
-
-function isCallbackRequest(text: string) {
-  return /\b(callback|call\s*back|call me|call you|talk to someone)\b/i.test(text)
-}
-
-function isGreetingPrompt(text: string) {
-  return /^(hi|hello|hey|good\s+(morning|afternoon|evening))(?:[.!?,\s]*)$/i.test(text.trim())
-}
-
-function isFallbackAssistantText(text: string) {
-  const lowered = text.toLowerCase()
-  const uncertainty =
-    /\b(i do not know|i don't know|i am not sure|i'm not sure|cannot answer|can't answer)\b/.test(lowered) ||
-    lowered.includes('do not guess')
-  const humanPath =
-    lowered.includes(ISOKE_CONTENT.contact.mainPhoneDisplay.toLowerCase()) ||
-    lowered.includes(ISOKE_CONTENT.contact.email.toLowerCase()) ||
-    lowered.includes('request a callback')
-
-  return uncertainty && humanPath
-}
-
-function classifyStageFromInput(text: string, isOutsideBusinessHours: boolean): ChatStage | null {
-  const lowered = text.toLowerCase()
-
-  if (isCallbackRequest(lowered)) return 'callback_offer'
-  if (lowered.includes('after-hours') || lowered.includes('after hours')) return 'after_hours'
-  if (lowered.includes('contact') || lowered.includes('hours') || lowered.includes('phone') || lowered.includes('email')) {
-    return isOutsideBusinessHours ? 'after_hours' : 'contact_info'
-  }
-  if (findServiceByText(lowered)) return 'exploring_services'
-  if (lowered.includes('service') || lowered.includes('support')) return 'exploring_services'
-
-  return null
 }
 
 function isOutsideBusinessHoursNow() {
@@ -207,17 +172,19 @@ export function ChatWidget() {
   const hasShownTeaserRef = useRef(false)
   const isOutsideBusinessHours = isOutsideBusinessHoursNow()
 
+  const transitionChatStage = useCallback((event: ChatStageTransition) => {
+    setChatStage((current) => reduceChatStage(current, event))
+  }, [])
+
   useEffect(() => {
     const handler = () => {
       setOpen(true)
       setTeaserVisible(false)
-      setChatStage((current) =>
-        current === 'teaser_hidden' || current === 'teaser_visible' ? 'chat_open_welcome' : current,
-      )
+      transitionChatStage({ type: 'open_chat' })
     }
     window.addEventListener(OPEN_CHAT_EVENT, handler)
     return () => window.removeEventListener(OPEN_CHAT_EVENT, handler)
-  }, [])
+  }, [transitionChatStage])
 
   const { messages, sendMessage, setMessages, status } = useChat({
     transport: new DefaultChatTransport({
@@ -235,7 +202,12 @@ export function ChatWidget() {
     }),
   })
 
-  const matchedService = findServiceByText(messages.map((message) => messageText(message.parts)).join('\n'))
+  const matchedService = findLatestUserServiceMatch(
+    messages.map((message) => ({
+      role: message.role,
+      text: messageText(message.parts),
+    })),
+  )
   const flowState = deriveChatFlowState({
     callbackFormOpen: showCallbackForm,
     firstName: visitorProfile.firstName,
@@ -321,12 +293,12 @@ export function ChatWidget() {
     const timeoutId = window.setTimeout(() => {
       hasShownTeaserRef.current = true
       setTeaserVisible(true)
-      setChatStage((current) => (current === 'teaser_hidden' ? 'teaser_visible' : current))
+      transitionChatStage({ type: 'show_teaser' })
       trackChatbotEvent('teaser_shown')
     }, 1600)
 
     return () => window.clearTimeout(timeoutId)
-  }, [open])
+  }, [open, transitionChatStage])
 
   useEffect(() => {
     if (lastIntentRef.current === flowState.intent) return
@@ -359,37 +331,36 @@ export function ChatWidget() {
     const lastText = messageText(lastMessage.parts)
 
     if (lastMessage.role === 'user') {
-      const nextStage = classifyStageFromInput(lastText, isOutsideBusinessHours)
+      const nextStage = classifyChatInputIntent(lastText, isOutsideBusinessHours)
       if (nextStage) {
-        setChatStage(nextStage)
+        transitionChatStage({ type: 'classified_input', stage: nextStage })
       } else if (messages.length >= 2) {
-        setChatStage((current) => (current === 'chat_open_welcome' ? 'collecting_name' : current))
+        transitionChatStage({ type: 'conversation_started' })
       }
     }
 
     const assistantFallback = lastMessage.role === 'assistant' && isFallbackAssistantText(lastText)
 
     if (assistantFallback) {
-      setChatStage((current) =>
-        current === 'after_hours' || current === 'callback_form' || current === 'callback_offer' ? current : 'fallback',
-      )
+      transitionChatStage({ type: 'assistant_fallback' })
       return
     }
 
     if (!visitorProfile.nameResolved && messages.length >= 2 && !showCallbackForm) {
-      setChatStage((current) =>
-        current === 'callback_offer' || current === 'callback_form' ? current : 'collecting_name',
-      )
+      transitionChatStage({ type: 'profile_prompt_needed', needsLocation: false, needsName: true })
     }
 
     if (visitorProfile.nameResolved && !visitorProfile.locationResolved && messages.length >= 2 && !showCallbackForm) {
-      setChatStage((current) =>
-        current === 'callback_offer' || current === 'callback_form' || current === 'after_hours'
-          ? current
-          : 'collecting_location',
-      )
+      transitionChatStage({ type: 'profile_prompt_needed', needsLocation: true, needsName: false })
     }
-  }, [isOutsideBusinessHours, messages, showCallbackForm, visitorProfile.locationResolved, visitorProfile.nameResolved])
+  }, [
+    isOutsideBusinessHours,
+    messages,
+    showCallbackForm,
+    transitionChatStage,
+    visitorProfile.locationResolved,
+    visitorProfile.nameResolved,
+  ])
 
   useEffect(() => {
     if (callbackForm.service || !matchedService) return
@@ -473,12 +444,12 @@ export function ChatWidget() {
     setOpen(true)
     setTeaserVisible(false)
     hasShownTeaserRef.current = true
-    setChatStage(stage)
+    transitionChatStage({ type: 'open_chat', stage })
   }
 
   const dismissTeaser = () => {
     setTeaserVisible(false)
-    setChatStage((current) => (current === 'teaser_visible' ? 'teaser_hidden' : current))
+    transitionChatStage({ type: 'dismiss_teaser' })
     if (typeof window !== 'undefined') {
       window.sessionStorage.setItem(CHATBOT_TEASER_DISMISSED_KEY, 'true')
     }
@@ -494,7 +465,7 @@ export function ChatWidget() {
       service: current.service || matchedService?.name || '',
     }))
     setShowCallbackForm(true)
-    setChatStage('callback_form')
+    transitionChatStage({ type: 'open_callback_form' })
   }
 
   const beginCallbackIntroduction = () => {
@@ -515,7 +486,7 @@ export function ChatWidget() {
 
   const closeCallbackForm = () => {
     setShowCallbackForm(false)
-    setChatStage(matchedService ? 'exploring_services' : 'resolved')
+    transitionChatStage({ type: 'close_callback_form', hasMatchedService: Boolean(matchedService) })
   }
 
   const onWelcomeAction = (action: (typeof WELCOME_ACTIONS)[number], source: 'teaser' | 'welcome' = 'welcome') => {
@@ -579,7 +550,7 @@ export function ChatWidget() {
       openCallbackForm()
     } else if (introComplete && isGreetingPrompt(text)) {
       setInput('')
-      setChatStage('resolved')
+      transitionChatStage({ type: 'queued_prompt_resolved', classifiedStage: null })
       pushInstantAssistantMessage(buildPersonalizedWelcome(visitorProfile.firstName))
       return true
     } else if (!introComplete) {
@@ -589,7 +560,10 @@ export function ChatWidget() {
     } else if (showCallbackForm) {
       setShowCallbackForm(false)
       setCallbackNotice(null)
-      setChatStage(classifyStageFromInput(text, isOutsideBusinessHours) ?? 'resolved')
+      transitionChatStage({
+        type: 'reset_after_callback_message',
+        classifiedStage: classifyChatInputIntent(text, isOutsideBusinessHours),
+      })
     }
 
     setInput('')
@@ -683,7 +657,7 @@ export function ChatWidget() {
         tone: 'success',
       })
       setShowCallbackForm(false)
-      setChatStage('resolved')
+      transitionChatStage({ type: 'callback_submitted' })
       setCallbackForm({
         bestTime: '',
         location: visitorProfile.cityState,
@@ -722,11 +696,11 @@ export function ChatWidget() {
         setShowCallbackForm(false)
         setCallbackNotice(null)
       }
-      const nextStage = classifyStageFromInput(action.text, isOutsideBusinessHours)
+      const nextStage = classifyChatInputIntent(action.text, isOutsideBusinessHours)
       if (nextStage) {
-        setChatStage(nextStage)
+        transitionChatStage({ type: 'classified_input', stage: nextStage })
       } else if (showCallbackForm) {
-        setChatStage('resolved')
+        transitionChatStage({ type: 'queued_prompt_resolved', classifiedStage: null })
       }
       sendProfileAwareMessage(action.text)
     }
@@ -759,14 +733,22 @@ export function ChatWidget() {
       } else if (pendingPrompt && locationAlreadyResolved) {
         const queuedPrompt = pendingPrompt
         setPendingPrompt(null)
-        setChatStage(classifyStageFromInput(queuedPrompt, isOutsideBusinessHours) ?? 'resolved')
+        transitionChatStage({
+          type: 'queued_prompt_resolved',
+          classifiedStage: classifyChatInputIntent(queuedPrompt, isOutsideBusinessHours),
+        })
         if (isGreetingPrompt(queuedPrompt)) {
           pushInstantAssistantMessage(buildPersonalizedWelcome(nextProfile.firstName))
         } else {
           sendProfileAwareMessage(queuedPrompt, nextProfile)
         }
       } else {
-        setChatStage('collecting_location')
+        transitionChatStage({
+          type: 'profile_name_completed',
+          hasLocationResolved: locationAlreadyResolved,
+          hasPendingAction: pendingAction === 'callback',
+          hasPendingPrompt: Boolean(pendingPrompt),
+        })
       }
     } else if (chatStage === 'collecting_location') {
       const nameAlreadyResolved = visitorProfile.nameResolved
@@ -789,14 +771,23 @@ export function ChatWidget() {
       } else if (pendingPrompt && nameAlreadyResolved) {
         const queuedPrompt = pendingPrompt
         setPendingPrompt(null)
-        setChatStage(classifyStageFromInput(queuedPrompt, isOutsideBusinessHours) ?? 'resolved')
+        transitionChatStage({
+          type: 'queued_prompt_resolved',
+          classifiedStage: classifyChatInputIntent(queuedPrompt, isOutsideBusinessHours),
+        })
         if (isGreetingPrompt(queuedPrompt)) {
           pushInstantAssistantMessage(buildPersonalizedWelcome(nextProfile.firstName))
         } else {
           sendProfileAwareMessage(queuedPrompt, nextProfile)
         }
       } else {
-        setChatStage(matchedService ? 'exploring_services' : 'resolved')
+        transitionChatStage({
+          type: 'profile_location_completed',
+          hasMatchedService: Boolean(matchedService),
+          hasNameResolved: nameAlreadyResolved,
+          hasPendingAction: pendingAction === 'callback',
+          hasPendingPrompt: Boolean(pendingPrompt),
+        })
       }
     }
 
@@ -815,14 +806,22 @@ export function ChatWidget() {
       } else if (pendingPrompt && locationAlreadyResolved) {
         const queuedPrompt = pendingPrompt
         setPendingPrompt(null)
-        setChatStage(classifyStageFromInput(queuedPrompt, isOutsideBusinessHours) ?? 'resolved')
+        transitionChatStage({
+          type: 'queued_prompt_resolved',
+          classifiedStage: classifyChatInputIntent(queuedPrompt, isOutsideBusinessHours),
+        })
         if (isGreetingPrompt(queuedPrompt)) {
           pushInstantAssistantMessage(buildPersonalizedWelcome(visitorProfile.firstName))
         } else {
           sendProfileAwareMessage(queuedPrompt)
         }
       } else {
-        setChatStage('collecting_location')
+        transitionChatStage({
+          type: 'profile_name_completed',
+          hasLocationResolved: locationAlreadyResolved,
+          hasPendingAction: pendingAction === 'callback',
+          hasPendingPrompt: Boolean(pendingPrompt),
+        })
       }
       return
     }
@@ -838,14 +837,23 @@ export function ChatWidget() {
       } else if (pendingPrompt && nameAlreadyResolved) {
         const queuedPrompt = pendingPrompt
         setPendingPrompt(null)
-        setChatStage(classifyStageFromInput(queuedPrompt, isOutsideBusinessHours) ?? 'resolved')
+        transitionChatStage({
+          type: 'queued_prompt_resolved',
+          classifiedStage: classifyChatInputIntent(queuedPrompt, isOutsideBusinessHours),
+        })
         if (isGreetingPrompt(queuedPrompt)) {
           pushInstantAssistantMessage(buildPersonalizedWelcome(visitorProfile.firstName))
         } else {
           sendProfileAwareMessage(queuedPrompt)
         }
       } else {
-        setChatStage(matchedService ? 'exploring_services' : 'resolved')
+        transitionChatStage({
+          type: 'profile_location_completed',
+          hasMatchedService: Boolean(matchedService),
+          hasNameResolved: nameAlreadyResolved,
+          hasPendingAction: pendingAction === 'callback',
+          hasPendingPrompt: Boolean(pendingPrompt),
+        })
       }
       return
     }
@@ -891,1036 +899,98 @@ export function ChatWidget() {
     return () => window.clearTimeout(timeoutId)
   }, [profilePromptKey, showCallbackForm])
 
+  const handlePhoneCtaClick = (placement: string) => {
+    trackChatbotEvent('phone_cta_clicked', { placement })
+  }
+
   return (
     <>
-      <AnimatePresence>
-        {teaserVisible && !open && (
-          <motion.div
-            initial={{ opacity: 0, y: 14, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 14, scale: 0.96 }}
-            transition={{ duration: 0.24, ease: 'easeOut' }}
-            style={{
-              position: 'fixed',
-              bottom: 102,
-              right: 28,
-              zIndex: 9989,
-              width: 'min(336px, calc(100vw - 40px))',
-              padding: '14px 14px 12px',
-              borderRadius: 24,
-              background: widgetTheme.shellBg,
-              border: `1px solid ${widgetTheme.shellBorder}`,
-              boxShadow: widgetTheme.shellShadow,
-              fontFamily: 'var(--font-body)',
-            }}
-          >
-            <button
-              type="button"
-              aria-label="Dismiss chat greeting"
-              onClick={dismissTeaser}
-              style={{
-                position: 'absolute',
-                top: 12,
-                right: 12,
-                padding: 6,
-                borderRadius: 10,
-                border: `1px solid ${widgetTheme.softBorder}`,
-                background: widgetTheme.softBg,
-                color: widgetTheme.text,
-                cursor: 'pointer',
-                display: 'flex',
-              }}
-            >
-              <X size={14} />
-            </button>
+      <ChatLauncher
+        chatStage={chatStage}
+        messagesLength={messages.length}
+        onDismissTeaser={dismissTeaser}
+        onOpen={openChatPanel}
+        onWelcomeAction={onWelcomeAction}
+        open={open}
+        teaserVisible={teaserVisible}
+        widgetTheme={widgetTheme}
+      />
 
-            <div
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '6px 10px',
-                borderRadius: 999,
-                background: widgetTheme.badgeBg,
-                color: widgetTheme.badgeText,
-                fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: '0.14em',
-                textTransform: 'uppercase',
-                marginBottom: 12,
-              }}
-            >
-              <Sparkles size={13} />
-              Isoke concierge
-            </div>
-
-            <div style={{ fontSize: 15, fontWeight: 700, color: widgetTheme.text, marginBottom: 6, paddingRight: 28 }}>
-              {ISOKE_CONTENT.onboarding.teaserTitle}
-            </div>
-            <div style={{ fontSize: 13, lineHeight: 1.58, color: widgetTheme.mutedText, marginBottom: 14 }}>
-              {ISOKE_CONTENT.onboarding.teaserBody}
-            </div>
-
-            <div style={{ display: 'grid', gap: 8 }}>
-              <button
-                type="button"
-                onClick={() => onWelcomeAction(WELCOME_ACTIONS[0], 'teaser')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 12,
-                  padding: '11px 12px',
-                  borderRadius: 16,
-                  border: 'none',
-                  background: 'linear-gradient(135deg, var(--violet) 0%, var(--violet-deep) 100%)',
-                  color: 'white',
-                  fontSize: 13,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                }}
-              >
-                {WELCOME_ACTIONS[0].label}
-                <ChevronRight size={15} />
-              </button>
-              <button
-                type="button"
-                onClick={() => onWelcomeAction(WELCOME_ACTIONS[1], 'teaser')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 12,
-                  padding: '11px 12px',
-                  borderRadius: 16,
-                  border: `1px solid ${widgetTheme.actionBorder}`,
-                  background: widgetTheme.surfaceSecondaryBg,
-                  color: widgetTheme.text,
-                  fontSize: 13,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                }}
-              >
-                {WELCOME_ACTIONS[1].label}
-                <ChevronRight size={15} />
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <button
-        type="button"
-        aria-label="Open chat"
-        onClick={() => openChatPanel(messages.length > 0 ? chatStage : 'chat_open_welcome')}
-        style={{
-          position: 'fixed',
-          bottom: 32,
-          right: 88,
-          zIndex: 9990,
-          width: 56,
-          height: 56,
-          borderRadius: '50%',
-          border: '1px solid rgba(123,94,167,0.35)',
-          background: 'linear-gradient(135deg, var(--violet) 0%, var(--violet-deep) 100%)',
-          color: 'white',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          boxShadow: '0 12px 32px rgba(123,94,167,0.32)',
-          fontFamily: 'var(--font-body)',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'translateY(-1px)'
-          e.currentTarget.style.boxShadow = '0 16px 38px rgba(123,94,167,0.4)'
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'translateY(0)'
-          e.currentTarget.style.boxShadow = '0 12px 32px rgba(123,94,167,0.32)'
-        }}
+      <ChatPanel
+        flowState={flowState}
+        input={input}
+        isLoading={isLoading}
+        onClose={() => setOpen(false)}
+        onComposerKeyDown={handleComposerKeyDown}
+        onInputChange={setInput}
+        onPhoneCtaClick={handlePhoneCtaClick}
+        onSubmit={handleSubmit}
+        open={open}
+        textareaRef={textareaRef}
+        widgetTheme={widgetTheme}
       >
-        <div
-          style={{
-            position: 'absolute',
-            top: 8,
-            right: 8,
-            width: 9,
-            height: 9,
-            borderRadius: '50%',
-            background: 'var(--teal)',
-            boxShadow: '0 0 0 4px rgba(232,149,109,0.18)',
-          }}
+        <MessageList
+          banner={banner}
+          flowState={flowState}
+          getMessageText={messageText}
+          isLoading={isLoading}
+          messages={messages}
+          onFlowAction={handleFlowAction}
+          onPhoneCtaClick={handlePhoneCtaClick}
+          onWelcomeAction={onWelcomeAction}
+          revealedAssistantText={revealedAssistantText}
+          widgetTheme={widgetTheme}
         />
-        <MessageCircle size={26} strokeWidth={1.8} />
-      </button>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, x: 24 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 24 }}
-            transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+        {showCallbackForm && (
+          <CallbackForm
+            callbackForm={callbackForm}
+            callbackSubmitting={callbackSubmitting}
+            onClose={closeCallbackForm}
+            onFieldChange={handleCallbackFieldChange}
+            onPhoneCtaClick={handlePhoneCtaClick}
+            onSubmit={handleCallbackSubmit}
+            widgetTheme={widgetTheme}
+          />
+        )}
+
+        {callbackNotice && (
+          <div
             style={{
-              position: 'fixed',
-              bottom: 24,
-              right: 24,
-              width: 'min(428px, calc(100vw - 32px))',
-              height: 'min(640px, calc(100vh - 92px))',
-              zIndex: 10000,
-              borderRadius: '28px',
-              background: widgetTheme.shellBg,
-              border: `1px solid ${widgetTheme.shellBorder}`,
-              boxShadow: widgetTheme.shellShadow,
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden',
-              fontFamily: 'var(--font-body)',
+              alignSelf: 'stretch',
+              padding: '11px 14px',
+              borderRadius: 16,
+              background: callbackNotice.tone === 'success' ? 'rgba(52, 211, 153, 0.12)' : 'rgba(185, 28, 28, 0.1)',
+              border:
+                callbackNotice.tone === 'success'
+                  ? '1px solid rgba(16,185,129,0.2)'
+                  : '1px solid rgba(185, 28, 28, 0.16)',
+              color: callbackNotice.tone === 'success' ? widgetTheme.text : '#fca5a5',
+              fontSize: 12.5,
+              lineHeight: 1.55,
+              textAlign: 'center',
             }}
           >
-            <div
-              style={{
-                padding: '18px 18px 14px',
-                borderBottom: `1px solid ${widgetTheme.footerBorder}`,
-                background:
-                  'radial-gradient(circle at top right, rgba(232,149,109,0.18) 0%, transparent 32%), linear-gradient(135deg, rgba(30,18,48,0.98) 0%, rgba(123,94,167,0.96) 100%)',
-                color: widgetTheme.headerText,
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div
-                    style={{
-                      width: 42,
-                      height: 42,
-                      borderRadius: '16px',
-                      background: 'rgba(255,255,255,0.12)',
-                      border: '1px solid rgba(255,255,255,0.16)',
-                      display: 'grid',
-                      placeItems: 'center',
-                      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18)',
-                    }}
-                  >
-                    <Sparkles size={18} strokeWidth={2.1} />
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 15.5 }}>Isoke Concierge</div>
-                    <div style={{ fontSize: 12.5, opacity: 0.84, lineHeight: 1.45 }}>
-                      Answers questions and helps route you to the right next step.
-                    </div>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  aria-label="Close chat"
-                  onClick={() => setOpen(false)}
-                  style={{
-                    background: 'rgba(255,255,255,0.08)',
-                    border: '1px solid rgba(255,255,255,0.12)',
-                    color: 'inherit',
-                    cursor: 'pointer',
-                    padding: 7,
-                    borderRadius: 12,
-                    display: 'flex',
-                  }}
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div
-                style={{
-                  marginTop: 14,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 12,
-                  flexWrap: 'wrap',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    padding: '8px 10px',
-                    borderRadius: 999,
-                    background: 'rgba(255,255,255,0.1)',
-                    border: '1px solid rgba(255,255,255,0.12)',
-                    fontSize: 12.5,
-                  }}
-                >
-                  <Clock3 size={14} />
-                  {ISOKE_CONTENT.contact.businessHours}
-                </div>
-                <a
-                  href={ISOKE_CONTENT.contact.mainPhoneHref}
-                  onClick={() => trackChatbotEvent('phone_cta_clicked', { placement: 'header' })}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    padding: '8px 12px',
-                    borderRadius: 999,
-                    background: 'rgba(255,255,255,0.16)',
-                    border: '1px solid rgba(255,255,255,0.16)',
-                    color: 'inherit',
-                    fontSize: 12.5,
-                    fontWeight: 600,
-                    textDecoration: 'none',
-                  }}
-                >
-                  <PhoneCall size={14} />
-                  Call now
-                </a>
-              </div>
-            </div>
-
-            <div
-              style={{
-                padding: '12px 18px',
-                borderBottom: `1px solid ${widgetTheme.footerBorder}`,
-                background: widgetTheme.statusBg,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 12,
-              }}
-            >
-              <div>
-                <div
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    letterSpacing: '0.14em',
-                    textTransform: 'uppercase',
-                    color: 'var(--muted)',
-                    marginBottom: 4,
-                  }}
-                >
-                  {flowState.badge}
-                </div>
-                <div style={{ fontSize: 13, color: widgetTheme.text, lineHeight: 1.45 }}>{flowState.description}</div>
-              </div>
-              <div
-                style={{
-                  flexShrink: 0,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: '7px 10px',
-                  borderRadius: 999,
-                  background: widgetTheme.pillBg,
-                  color: widgetTheme.badgeText,
-                  fontSize: 12,
-                  fontWeight: 700,
-                }}
-              >
-                <div
-                  style={{
-                    width: 7,
-                    height: 7,
-                    borderRadius: '50%',
-                    background: 'var(--teal)',
-                  }}
-                />
-                Callback available
-              </div>
-            </div>
-
-            <div
-              style={{
-                flex: 1,
-                overflow: 'auto',
-                padding: '16px 16px 18px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 12,
-                background: widgetTheme.canvasBg,
-              }}
-            >
-              {messages.length === 0 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, ease: 'easeOut' }}
-                  style={{
-                    alignSelf: 'stretch',
-                    marginBottom: 4,
-                    padding: '14px',
-                    borderRadius: 20,
-                    background: widgetTheme.surfaceBg,
-                    border: `1px solid ${widgetTheme.softBorder}`,
-                    boxShadow: '0 12px 30px rgba(30,18,48,0.06)',
-                  }}
-                >
-                  <div
-                    style={{
-                      alignSelf: 'stretch',
-                      marginBottom: 10,
-                    }}
-                  >
-                    <div
-                      style={{
-                        marginBottom: 5,
-                        fontSize: 11,
-                        fontWeight: 700,
-                        letterSpacing: '0.12em',
-                        textTransform: 'uppercase',
-                        color: 'var(--muted)',
-                        paddingLeft: 6,
-                      }}
-                    >
-                      Isoke concierge
-                    </div>
-                    <div
-                      style={{
-                        padding: '12px 14px',
-                        borderRadius: '18px 18px 18px 8px',
-                        fontSize: 14,
-                        lineHeight: 1.55,
-                        letterSpacing: '0.005em',
-                        background: widgetTheme.assistantBg,
-                        border: `1px solid ${widgetTheme.assistantBorder}`,
-                        color: widgetTheme.text,
-                        boxShadow: '0 10px 24px rgba(30,18,48,0.05)',
-                      }}
-                    >
-                      Hi, I can help with services, contact details, or a callback.
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gap: 7 }}>
-                    {WELCOME_ACTIONS.map((action) => (
-                      <button
-                        key={action.id}
-                        type="button"
-                        onClick={() => onWelcomeAction(action)}
-                        style={{
-                          textAlign: 'left',
-                          padding: '10px 12px',
-                          borderRadius: 14,
-                          border: `1px solid ${widgetTheme.actionBorder}`,
-                          background: widgetTheme.surfaceSecondaryBg,
-                          color: widgetTheme.text,
-                          cursor: 'pointer',
-                          transition: 'transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease',
-                          boxShadow: '0 4px 14px rgba(30,18,48,0.04)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: 10,
-                        }}
-                      >
-                        <div>
-                          <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 2 }}>{action.label}</div>
-                          <div style={{ fontSize: 12, lineHeight: 1.42, color: 'var(--muted)' }}>
-                            {action.description}
-                          </div>
-                        </div>
-                        <ChevronRight size={16} style={{ color: widgetTheme.linkAccent, flexShrink: 0 }} />
-                      </button>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-
-              {messages.map((message) => {
-                const isAssistant = message.role === 'assistant'
-                return (
-                  <div
-                    key={message.id}
-                    style={{
-                      alignSelf: isAssistant ? 'flex-start' : 'flex-end',
-                      maxWidth: isAssistant ? '92%' : '84%',
-                    }}
-                  >
-                    {isAssistant && (
-                      <div
-                        style={{
-                          marginBottom: 6,
-                          fontSize: 11,
-                          fontWeight: 700,
-                          letterSpacing: '0.12em',
-                          textTransform: 'uppercase',
-                          color: 'var(--muted)',
-                          paddingLeft: 6,
-                        }}
-                      >
-                        Isoke concierge
-                      </div>
-                    )}
-                    <div
-                      style={{
-                        padding: isAssistant ? '14px 16px' : '12px 14px',
-                        borderRadius: isAssistant ? '18px 18px 18px 8px' : '18px 18px 8px 18px',
-                        fontSize: isAssistant ? 15 : 14,
-                        lineHeight: isAssistant ? 1.72 : 1.6,
-                        letterSpacing: isAssistant ? '0.005em' : '0.01em',
-                        whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-word',
-                        boxShadow: isAssistant ? '0 10px 24px rgba(30,18,48,0.05)' : '0 10px 22px rgba(123,94,167,0.18)',
-                        ...(isAssistant
-                          ? {
-                              background: widgetTheme.assistantBg,
-                              border: `1px solid ${widgetTheme.assistantBorder}`,
-                              color: widgetTheme.text,
-                            }
-                          : {
-                              background: 'linear-gradient(135deg, var(--violet) 0%, var(--ink-soft) 100%)',
-                              color: 'white',
-                            }),
-                      }}
-                    >
-                      {isAssistant ? revealedAssistantText[message.id] ?? '' : messageText(message.parts)}
-                    </div>
-                  </div>
-                )
-              })}
-
-              {isLoading && messages[messages.length - 1]?.role === 'user' && (
-                <div
-                  style={{
-                    alignSelf: 'flex-start',
-                    padding: '12px 16px',
-                    borderRadius: '18px 18px 18px 8px',
-                    background: widgetTheme.assistantBg,
-                    border: `1px solid ${widgetTheme.assistantBorder}`,
-                    color: widgetTheme.mutedText,
-                    fontSize: 15,
-                    letterSpacing: '0.12em',
-                    boxShadow: '0 10px 24px rgba(30,18,48,0.05)',
-                  }}
-                >
-                  ...
-                </div>
-              )}
-
-              {banner && (
-                <div
-                  style={{
-                    alignSelf: 'stretch',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    padding: '12px 14px',
-                    borderRadius: 16,
-                    background:
-                      banner.tone === 'after-hours'
-                        ? 'rgba(232,149,109,0.12)'
-                        : banner.tone === 'fallback'
-                          ? 'rgba(123,94,167,0.08)'
-                          : 'rgba(52, 211, 153, 0.12)',
-                    border:
-                      banner.tone === 'after-hours'
-                        ? '1px solid rgba(232,149,109,0.2)'
-                        : banner.tone === 'fallback'
-                          ? '1px solid rgba(123,94,167,0.14)'
-                          : '1px solid rgba(16,185,129,0.16)',
-                    color: widgetTheme.text,
-                    fontSize: 13,
-                    lineHeight: 1.55,
-                  }}
-                >
-                  <banner.icon size={16} style={{ flexShrink: 0, color: widgetTheme.badgeText }} />
-                  <span>{banner.text}</span>
-                </div>
-              )}
-
-              {messages.length > 0 && flowState.actions.length > 0 && !isLoading && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {flowState.actions.map((action) =>
-                    action.kind === 'link' ? (
-                      <a
-                        key={action.id}
-                        href={action.href}
-                        onClick={() => trackChatbotEvent('phone_cta_clicked', { placement: action.id })}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 8,
-                          padding: '9px 12px',
-                          borderRadius: 999,
-                          border: `1px solid ${widgetTheme.actionBorder}`,
-                          background: widgetTheme.actionBg,
-                          color: widgetTheme.text,
-                          textDecoration: 'none',
-                          fontSize: 12.5,
-                          fontWeight: 600,
-                          boxShadow: '0 6px 16px rgba(30,18,48,0.04)',
-                        }}
-                      >
-                        {action.label}
-                        <ArrowUpRight size={14} />
-                      </a>
-                    ) : (
-                      <button
-                        key={action.id}
-                        type="button"
-                        onClick={() => handleFlowAction(action)}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 8,
-                          padding: '9px 12px',
-                          borderRadius: 999,
-                          border: `1px solid ${widgetTheme.actionBorder}`,
-                          background: action.kind === 'callback' ? widgetTheme.pillBg : widgetTheme.actionBg,
-                          color: widgetTheme.text,
-                          cursor: 'pointer',
-                          fontSize: 12.5,
-                          fontWeight: 600,
-                          boxShadow: '0 6px 16px rgba(30,18,48,0.04)',
-                        }}
-                      >
-                        {action.label}
-                        <ChevronRight size={14} />
-                      </button>
-                    ),
-                  )}
-                </div>
-              )}
-
-              {showCallbackForm && (
-                <div
-                  style={{
-                    alignSelf: 'stretch',
-                    padding: '16px',
-                    borderRadius: 22,
-                    background: widgetTheme.surfaceBg,
-                    border: `1px solid ${widgetTheme.softBorder}`,
-                    boxShadow: '0 14px 32px rgba(30,18,48,0.08)',
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: 12,
-                      marginBottom: 10,
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: widgetTheme.text, marginBottom: 4 }}>
-                        Request a callback
-                      </div>
-                      <div style={{ fontSize: 12.5, lineHeight: 1.55, color: widgetTheme.mutedText }}>
-                        Share the best details for a follow-up from the Isoke team.
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={closeCallbackForm}
-                      style={{
-                        padding: 6,
-                        borderRadius: 10,
-                        border: `1px solid ${widgetTheme.actionBorder}`,
-                        background: widgetTheme.surfaceSecondaryBg,
-                        color: widgetTheme.text,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      <X size={15} />
-                    </button>
-                  </div>
-
-                  <form onSubmit={handleCallbackSubmit} style={{ display: 'grid', gap: 10 }}>
-                    <input
-                      type="text"
-                      value={callbackForm.name}
-                      onChange={(e) => handleCallbackFieldChange('name', e.target.value)}
-                      placeholder="Your name"
-                      disabled={callbackSubmitting}
-                      style={{
-                        padding: '11px 12px',
-                        borderRadius: 14,
-                        border: `1px solid ${widgetTheme.inputBorder}`,
-                        background: widgetTheme.inputBg,
-                        color: widgetTheme.text,
-                        fontSize: 14,
-                        fontFamily: 'inherit',
-                        outline: 'none',
-                      }}
-                    />
-                    <input
-                      type="tel"
-                      value={callbackForm.phone}
-                      onChange={(e) => handleCallbackFieldChange('phone', e.target.value)}
-                      placeholder="Phone number"
-                      disabled={callbackSubmitting}
-                      style={{
-                        padding: '11px 12px',
-                        borderRadius: 14,
-                        border: `1px solid ${widgetTheme.inputBorder}`,
-                        background: widgetTheme.inputBg,
-                        color: widgetTheme.text,
-                        fontSize: 14,
-                        fontFamily: 'inherit',
-                        outline: 'none',
-                      }}
-                    />
-                    <input
-                      type="text"
-                      value={callbackForm.location ?? ''}
-                      onChange={(e) => handleCallbackFieldChange('location', e.target.value)}
-                      placeholder="City and state (optional)"
-                      disabled={callbackSubmitting}
-                      style={{
-                        padding: '11px 12px',
-                        borderRadius: 14,
-                        border: `1px solid ${widgetTheme.inputBorder}`,
-                        background: widgetTheme.inputBg,
-                        color: widgetTheme.text,
-                        fontSize: 14,
-                        fontFamily: 'inherit',
-                        outline: 'none',
-                      }}
-                    />
-                    <textarea
-                      value={callbackForm.bestTime}
-                      onChange={(e) => handleCallbackFieldChange('bestTime', e.target.value)}
-                      placeholder="Best time to call"
-                      disabled={callbackSubmitting}
-                      rows={2}
-                      style={{
-                        minHeight: 80,
-                        padding: '11px 12px',
-                        borderRadius: 14,
-                        border: `1px solid ${widgetTheme.inputBorder}`,
-                        background: widgetTheme.inputBg,
-                        color: widgetTheme.text,
-                        fontSize: 14,
-                        lineHeight: 1.5,
-                        fontFamily: 'inherit',
-                        outline: 'none',
-                        resize: 'vertical',
-                      }}
-                    />
-                    <select
-                      value={callbackForm.service}
-                      onChange={(e) => handleCallbackFieldChange('service', e.target.value)}
-                      disabled={callbackSubmitting}
-                      style={{
-                        padding: '11px 12px',
-                        borderRadius: 14,
-                        border: `1px solid ${widgetTheme.inputBorder}`,
-                        background: widgetTheme.inputBg,
-                        color: widgetTheme.text,
-                        fontSize: 14,
-                        fontFamily: 'inherit',
-                        outline: 'none',
-                      }}
-                    >
-                      <option value="">Service of interest (optional)</option>
-                      {ISOKE_CONTENT.services.map((service) => (
-                        <option key={service.name} value={service.name}>
-                          {service.name}
-                        </option>
-                      ))}
-                    </select>
-
-                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                      <button
-                        type="submit"
-                        disabled={callbackSubmitting}
-                        style={{
-                          flex: 1,
-                          minWidth: 160,
-                          padding: '11px 14px',
-                          borderRadius: 999,
-                          border: 'none',
-                          background: 'linear-gradient(135deg, var(--violet) 0%, var(--violet-deep) 100%)',
-                          color: 'white',
-                          fontWeight: 700,
-                          fontSize: 13,
-                          fontFamily: 'inherit',
-                          cursor: callbackSubmitting ? 'not-allowed' : 'pointer',
-                          opacity: callbackSubmitting ? 0.7 : 1,
-                        }}
-                      >
-                        {callbackSubmitting ? 'Sending...' : 'Send callback request'}
-                      </button>
-                      <a
-                        href={ISOKE_CONTENT.contact.mainPhoneHref}
-                        onClick={() => trackChatbotEvent('phone_cta_clicked', { placement: 'callback_form' })}
-                        style={{
-                          padding: '11px 14px',
-                          borderRadius: 999,
-                          border: `1px solid ${widgetTheme.actionBorder}`,
-                          background: widgetTheme.surfaceSecondaryBg,
-                          color: widgetTheme.text,
-                          fontSize: 13,
-                          fontWeight: 700,
-                          textDecoration: 'none',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 8,
-                        }}
-                      >
-                        <PhoneCall size={14} />
-                        Call instead
-                      </a>
-                    </div>
-                  </form>
-                </div>
-              )}
-
-              {callbackNotice && (
-                <div
-                  style={{
-                    alignSelf: 'stretch',
-                    padding: '11px 14px',
-                    borderRadius: 16,
-                    background:
-                      callbackNotice.tone === 'success'
-                        ? 'rgba(52, 211, 153, 0.12)'
-                        : 'rgba(185, 28, 28, 0.1)',
-                    border:
-                      callbackNotice.tone === 'success'
-                        ? '1px solid rgba(16,185,129,0.2)'
-                        : '1px solid rgba(185, 28, 28, 0.16)',
-                    color: callbackNotice.tone === 'success' ? widgetTheme.text : '#fca5a5',
-                    fontSize: 12.5,
-                    lineHeight: 1.55,
-                    textAlign: 'center',
-                  }}
-                >
-                  {callbackNotice.text}
-                </div>
-              )}
-
-              {profilePrompt && !showCallbackForm && (
-                <>
-                  <div
-                    style={{
-                      alignSelf: 'flex-start',
-                      maxWidth: '92%',
-                    }}
-                  >
-                    <div
-                      style={{
-                        marginBottom: 6,
-                        fontSize: 11,
-                        fontWeight: 700,
-                        letterSpacing: '0.12em',
-                        textTransform: 'uppercase',
-                        color: 'var(--muted)',
-                        paddingLeft: 6,
-                      }}
-                    >
-                      Isoke concierge
-                    </div>
-                    <div
-                      style={{
-                        padding: '14px 16px',
-                        borderRadius: '18px 18px 18px 8px',
-                        fontSize: 15,
-                        lineHeight: 1.72,
-                        letterSpacing: '0.005em',
-                        whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-word',
-                        background: widgetTheme.assistantBg,
-                        border: `1px solid ${widgetTheme.assistantBorder}`,
-                        color: widgetTheme.text,
-                        boxShadow: '0 10px 24px rgba(30,18,48,0.05)',
-                      }}
-                    >
-                      {buildIntroLeadMessage({ pendingAction, pendingPrompt })}
-                    </div>
-                  </div>
-
-                  <div
-                    ref={profilePromptRef}
-                    style={{
-                      alignSelf: 'stretch',
-                      padding: '16px',
-                      borderRadius: 22,
-                      background: widgetTheme.surfaceBg,
-                      border: `1px solid ${widgetTheme.softBorder}`,
-                      boxShadow: '0 14px 30px rgba(30,18,48,0.07)',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 12 }}>
-                      <div
-                        style={{
-                          width: 40,
-                          height: 40,
-                          borderRadius: 14,
-                          background: widgetTheme.pillBg,
-                          color: widgetTheme.badgeText,
-                          display: 'grid',
-                          placeItems: 'center',
-                          flexShrink: 0,
-                        }}
-                      >
-                        <profilePrompt.icon size={18} />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: widgetTheme.text, marginBottom: 4 }}>
-                          {profilePrompt.title}
-                        </div>
-                        <div style={{ fontSize: 12.5, lineHeight: 1.58, color: widgetTheme.mutedText }}>
-                          {profilePrompt.prompt}
-                        </div>
-                      </div>
-                    </div>
-
-                    <form onSubmit={handleProfileSubmit} style={{ display: 'grid', gap: 10 }}>
-                      <input
-                        ref={profileInputRef}
-                        type="text"
-                        value={profileDraft}
-                        onChange={(e) => setProfileDraft(e.target.value)}
-                        placeholder={profilePrompt.placeholder}
-                        style={{
-                          padding: '11px 12px',
-                          borderRadius: 14,
-                          border: `1px solid ${widgetTheme.inputBorder}`,
-                          background: widgetTheme.inputBg,
-                          color: widgetTheme.text,
-                          fontSize: 14,
-                          fontFamily: 'inherit',
-                          outline: 'none',
-                        }}
-                      />
-                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                        <button
-                          type="submit"
-                          disabled={!profileDraft.trim()}
-                          style={{
-                            flex: 1,
-                            minWidth: 140,
-                            padding: '11px 14px',
-                            borderRadius: 999,
-                            border: 'none',
-                            background: 'linear-gradient(135deg, var(--violet) 0%, var(--violet-deep) 100%)',
-                            color: 'white',
-                            fontWeight: 700,
-                            fontSize: 13,
-                            cursor: profileDraft.trim() ? 'pointer' : 'not-allowed',
-                            opacity: profileDraft.trim() ? 1 : 0.65,
-                            fontFamily: 'inherit',
-                          }}
-                        >
-                          {profilePrompt.cta}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={skipProfilePrompt}
-                          style={{
-                            padding: '11px 14px',
-                            borderRadius: 999,
-                            border: `1px solid ${widgetTheme.actionBorder}`,
-                            background: widgetTheme.surfaceSecondaryBg,
-                            color: widgetTheme.text,
-                            fontWeight: 700,
-                            fontSize: 13,
-                            cursor: 'pointer',
-                            fontFamily: 'inherit',
-                          }}
-                        >
-                          {profilePrompt.secondary}
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </>
-              )}
-
-              <div ref={messagesEndRef} />
-            </div>
-
-            <div
-              style={{
-                padding: '14px 14px 16px',
-                borderTop: `1px solid ${widgetTheme.footerBorder}`,
-                background: widgetTheme.footerBg,
-                backdropFilter: 'blur(16px)',
-              }}
-            >
-              <form id="chat-form" onSubmit={handleSubmit} style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
-                <textarea
-                  ref={textareaRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleComposerKeyDown}
-                  placeholder="Type a message..."
-                  disabled={isLoading}
-                  rows={1}
-                  style={{
-                    flex: 1,
-                    padding: '11px 14px',
-                    minHeight: 48,
-                    maxHeight: 132,
-                    borderRadius: 18,
-                    border: `1px solid ${widgetTheme.inputBorder}`,
-                    background: widgetTheme.inputBg,
-                    color: widgetTheme.text,
-                    fontSize: 14,
-                    lineHeight: 1.5,
-                    letterSpacing: '0.01em',
-                    fontFamily: 'inherit',
-                    outline: 'none',
-                    resize: 'none',
-                    overflowY: 'auto',
-                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.8)',
-                  }}
-                />
-                <button
-                  type="submit"
-                  disabled={isLoading || !input.trim()}
-                  style={{
-                    padding: '12px 16px',
-                    borderRadius: 18,
-                    border: 'none',
-                    background: 'linear-gradient(135deg, var(--violet) 0%, var(--violet-deep) 100%)',
-                    color: 'white',
-                    fontWeight: 700,
-                    fontSize: 13,
-                    cursor: isLoading || !input.trim() ? 'not-allowed' : 'pointer',
-                    opacity: isLoading || !input.trim() ? 0.6 : 1,
-                    fontFamily: 'inherit',
-                    boxShadow: '0 10px 24px rgba(123,94,167,0.24)',
-                  }}
-                >
-                  Send
-                </button>
-              </form>
-              <div
-                style={{
-                  marginTop: 8,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 10,
-                  flexWrap: 'wrap',
-                  color: widgetTheme.mutedText,
-                  fontSize: 11.5,
-                }}
-              >
-                <span>Press Enter to send. Shift+Enter for a new line.</span>
-                <a
-                  href={ISOKE_CONTENT.contact.mainPhoneHref}
-                  onClick={() => trackChatbotEvent('phone_cta_clicked', { placement: 'footer' })}
-                  style={{
-                    color: widgetTheme.linkAccent,
-                    textDecoration: 'none',
-                    fontWeight: 700,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 6,
-                  }}
-                >
-                  Call {ISOKE_CONTENT.contact.mainPhoneDisplay}
-                  <ArrowUpRight size={13} />
-                </a>
-              </div>
-            </div>
-          </motion.div>
+            {callbackNotice.text}
+          </div>
         )}
-      </AnimatePresence>
+
+        {profilePrompt && !showCallbackForm && (
+          <ProfilePrompt
+            introLeadMessage={buildIntroLeadMessage({ pendingAction, pendingPrompt })}
+            onDraftChange={setProfileDraft}
+            onSkip={skipProfilePrompt}
+            onSubmit={handleProfileSubmit}
+            profileDraft={profileDraft}
+            profileInputRef={profileInputRef}
+            profilePrompt={profilePrompt}
+            profilePromptRef={profilePromptRef}
+            widgetTheme={widgetTheme}
+          />
+        )}
+
+        <div ref={messagesEndRef} />
+      </ChatPanel>
     </>
   )
 }

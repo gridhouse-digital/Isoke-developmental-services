@@ -37,15 +37,17 @@ Business facts live in `chatbot/isoke-content.js`, not hardcoded directly inside
 The content source holds:
 - business identity and mission
 - audience
+- capabilities, limitations, and privacy notice
 - contact details
 - after-hours number and business hours
-- service catalog and short descriptions
+- service catalog, short descriptions, and service aliases
 - welcome actions and default prompts
 - onboarding copy for the teaser and progressive profile prompts
 
 The system prompt is generated from that source. The prompt should only define:
 - tone
 - allowed knowledge boundaries
+- concise response expectations
 - response rules
 - fallback behavior
 - callback escalation behavior
@@ -65,7 +67,8 @@ Primary intents:
 
 Behavior rules:
 - answer clearly using only approved Isoke information
-- end most replies with one next step
+- keep replies short by default, usually 2-5 short sentences or a tight bullet list
+- lead with the answer and end most replies with one next step
 - do not guess when uncertain
 - use direct contact or callback when the question is unresolved
 - treat after-hours as a special support state, not just another reply
@@ -73,7 +76,9 @@ Behavior rules:
 - ask for first name after meaningful engagement
 - ask for city and state only when it helps routing or follow-up
 - do not request exact address or browser geolocation permission
-- if a service, contact, or callback path starts before the quick introduction is complete, finish the intro prompts before showing deferred assistant replies or the callback form
+- if a service, contact, after-hours, or callback path starts before the quick introduction is complete, answer or route first instead of blocking on profile prompts
+- use service aliases from `chatbot/isoke-content.js` for common visitor wording such as nursing, rides, respite care, companion, and community support
+- use the fallback style: "I'm not sure I can answer that safely. Here are the fastest next steps..."
 - once first name and city/state are collected, pass that context into the next chat request so the assistant can greet the visitor naturally by name
 - greeting-only follow-ups such as `hi` or `hello` are answered immediately in the UI with a personalized welcome instead of waiting on a full model round-trip
 

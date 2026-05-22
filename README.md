@@ -1,73 +1,72 @@
-# React + TypeScript + Vite
+# Isoke Website
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + TypeScript + Vite site for Isoke Developmental Services, including a guided chatbot, contact form, and callback intake.
 
-Currently, two official plugins are available:
+**Stack:** Vite 7, React 19, TypeScript, Tailwind CSS v4, Framer Motion, react-router-dom v7
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Getting started
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev:full
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Open [http://localhost:5173](http://localhost:5173).
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Use `npm run dev:full` when you need the chatbot, contact form, or callback flow to work locally. For frontend-only work, `npm run dev` is enough.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Local development
+
+`npm run dev:full` starts two processes via [`scripts/dev-full.mjs`](scripts/dev-full.mjs):
+
+| Process | Command | URL | Purpose |
+|---------|---------|-----|---------|
+| Frontend | Vite | http://localhost:5173 | React app with HMR |
+| API | `scripts/dev-api.mjs` | http://localhost:3001 | `/api/chat`, `/api/callback`, `/api/contact` |
+
+Vite proxies `/api` requests to the local API server ([`vite.config.ts`](vite.config.ts)), so the browser can use `/api/*` on port 5173 while the API runs on 3001.
+
+To confirm the API is running:
+
+```bash
+curl http://localhost:3001/health
 ```
+
+Expected response: `{"ok":true}`
+
+Press `Ctrl+C` once to stop both servers.
+
+## Environment configuration
+
+Chat and email features require a local `.env` file in the project root. The dev API loads it at startup.
+
+- Do not commit `.env` or put secrets in tracked files.
+- Copy required values from your team's secure secret store or deployment environment.
+- See [`docs/chatbot/isoke-chatbot-handbook.md`](docs/chatbot/isoke-chatbot-handbook.md) for the full local setup and deployment checklist.
+
+Without a configured `.env`, the site still runs, but chat and email-backed forms will return configuration errors.
+
+## Scripts
+
+| Script | Description |
+|--------|-------------|
+| `npm run dev:full` | Frontend + local API (recommended for full local testing) |
+| `npm run dev` | Frontend only |
+| `npm run dev:api` | Local API only |
+| `npm run build` | Production build |
+| `npm run preview` | Preview the production build (static site only) |
+| `npm run typecheck` | TypeScript check |
+| `npm run lint` | ESLint |
+| `npm run test` | Node test runner |
+
+## Windows note
+
+This project lives in a path with spaces. npm scripts invoke Vite and TypeScript through `node` directly, so use the npm scripts above rather than calling `node_modules/.bin` yourself.
+
+## Troubleshooting
+
+- **Chat or forms fail locally** — Make sure `npm run dev:full` is running, not just `npm run dev`.
+- **API routes return configuration errors** — Check that `.env` exists and restart the dev server after changes.
+- **Email submissions fail** — Verify local env configuration and review server logs in the terminal running `dev:api`.
+
+For chatbot-specific QA and production deployment steps, see [`docs/chatbot/isoke-chatbot-handbook.md`](docs/chatbot/isoke-chatbot-handbook.md).
