@@ -284,13 +284,32 @@ html.dark .section-warm {
 ══════════════════════════════════════════════════ */
 
 /* Hero slide imagery — above dark-section overlay, stronger in both themes */
+.hero-section {
+  width: 100%;
+  max-width: none;
+}
+
 .hero-image-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 55%;
   z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
 }
 
 .hero-slide-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
   opacity: 0.58;
   filter: saturate(1.12) contrast(1.06);
+  transform: scale(1.06);
+  transform-origin: center center;
 }
 
 html.dark .hero-slide-image {
@@ -298,11 +317,31 @@ html.dark .hero-slide-image {
   filter: saturate(1.08) contrast(1.04);
 }
 
+.hero-slide-scrim,
+.hero-slide-fade-left,
+.hero-slide-fade-bottom {
+  position: absolute;
+  pointer-events: none;
+}
+
+/* Mobile-only full-viewport scrim (hidden on desktop) */
+.hero-slide-scrim {
+  display: none;
+}
+
 .hero-slide-fade-left {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 45%;
   background: linear-gradient(to right, rgba(14, 8, 24, 0.92) 0%, transparent 100%);
 }
 
 .hero-slide-fade-bottom {
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 160px;
   background: linear-gradient(to top, rgba(30, 18, 48, 0.85) 0%, transparent 100%);
 }
 
@@ -316,6 +355,52 @@ html.dark .hero-slide-fade-bottom {
 
 /* Hero content wrapper */
 @media (max-width: 767px) {
+  .hero-image-panel {
+    inset: 0;
+    width: 100%;
+    left: 0;
+    right: 0;
+  }
+
+  .hero-slide-image {
+    object-position: center 22%;
+    opacity: 0.48;
+    transform: scale(1.1);
+  }
+
+  html.dark .hero-slide-image {
+    opacity: 0.42;
+  }
+
+  /* Full-viewport overlay for readable text over background photo */
+  .hero-slide-scrim {
+    display: block;
+    inset: 0;
+    background:
+      linear-gradient(180deg, rgba(14, 8, 24, 0.82) 0%, rgba(14, 8, 24, 0.52) 42%, rgba(14, 8, 24, 0.78) 100%),
+      radial-gradient(ellipse 90% 60% at 50% 0%, rgba(123, 94, 167, 0.22) 0%, transparent 70%);
+  }
+
+  html.dark .hero-slide-scrim {
+    background:
+      linear-gradient(180deg, rgba(13, 13, 15, 0.88) 0%, rgba(13, 13, 15, 0.58) 42%, rgba(13, 13, 15, 0.86) 100%),
+      radial-gradient(ellipse 90% 60% at 50% 0%, rgba(123, 94, 167, 0.14) 0%, transparent 70%);
+  }
+
+  /* Side fade becomes redundant on mobile — scrim handles legibility */
+  .hero-slide-fade-left {
+    display: none;
+  }
+
+  .hero-slide-fade-bottom {
+    height: 38%;
+    background: linear-gradient(to top, rgba(14, 8, 24, 0.94) 0%, transparent 100%);
+  }
+
+  html.dark .hero-slide-fade-bottom {
+    background: linear-gradient(to top, rgba(13, 13, 15, 0.92) 0%, transparent 100%);
+  }
+
   .hero-content-wrap {
     padding: 120px 20px 64px !important;
   }
@@ -328,10 +413,6 @@ html.dark .hero-slide-fade-bottom {
     padding: 13px 22px !important;
     font-size: 15px !important;
     white-space: nowrap !important;
-  }
-  /* Hide decorative image panel on mobile — gradient mesh background is sufficient */
-  .hero-image-panel {
-    display: none !important;
   }
 }
 
@@ -576,9 +657,14 @@ html.dark .dark-section::after {
   z-index: 1;
 }
 
-/* Lift all direct children above the overlay */
-html.dark .dark-section > * {
+/* Lift content above overlay — keep hero background layers absolute/full-bleed */
+html.dark .dark-section > *:not(.hero-image-panel) {
   position: relative;
+  z-index: 2;
+}
+
+html.dark .dark-section > .hero-image-panel {
+  position: absolute;
   z-index: 2;
 }
 
