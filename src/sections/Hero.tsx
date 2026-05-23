@@ -50,7 +50,7 @@ export function Hero() {
 
   return (
     <section
-      className="dark-section"
+      className="dark-section hero-section"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       style={{
@@ -70,40 +70,22 @@ export function Hero() {
         <motion.div
           key={active}
           aria-hidden="true"
-          initial={{ opacity: 0, scale: 1.04 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.98 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
           transition={{ duration: 1.1, ease }}
-          style={{
-            position: 'absolute',
-            top: 0, bottom: 0, right: 0,
-            width: '55%',
-          }}
           className="hero-image-panel"
         >
           <img
             src={slide.image}
             alt=""
             className="hero-slide-image"
-            style={{
-              width: '100%', height: '100%',
-              objectFit: 'cover', objectPosition: 'center top',
-            }}
+            decoding="async"
+            fetchPriority={active === 0 ? 'high' : 'auto'}
           />
-          {/* Left fade */}
-          <div
-            className="hero-slide-fade-left"
-            style={{
-              position: 'absolute', top: 0, bottom: 0, left: 0, width: '45%',
-            }}
-          />
-          {/* Bottom fade */}
-          <div
-            className="hero-slide-fade-bottom"
-            style={{
-              position: 'absolute', bottom: 0, left: 0, right: 0, height: 160,
-            }}
-          />
+          <div className="hero-slide-scrim" aria-hidden="true" />
+          <div className="hero-slide-fade-left" aria-hidden="true" />
+          <div className="hero-slide-fade-bottom" aria-hidden="true" />
         </motion.div>
       </AnimatePresence>
 
